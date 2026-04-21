@@ -44,16 +44,16 @@ export function NavMain({
         <SidebarMenu>
 
           {items.map((item) => (
-            <SidebarMenuItem key={item.title} className='b'>
+            <SidebarMenuItem key={item.title} className=''>
               <SidebarMenuButton
-                className="group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:mx-auto [&>svg]:size-5"
+                className="h-10 group-data-[collapsible=icon]:size-10!   [&>svg]:size-6"
                 tooltip={item.title}
                 asChild
                 isActive={isItemActive(item.url)}
               >
-                <Link to={item.url}>
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
+                <Link className='' to={item.url}>
+                  {item.icon && <item.icon className="" />}
+                  <span className=''>{item.title}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

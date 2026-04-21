@@ -9,11 +9,11 @@
 
 :root {
     --background: #faf8f5;
-    --foreground: oklch(0.145 0.005 250);
+    --foreground: #696767;
     --card: #fff;
-    --card-foreground: oklch(0.145 0.005 250);
+    --card-foreground: #696767;
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0.005 250);
+    --popover-foreground: #696767;
     --primary: #428CFD;
     /* --primary: #428CFD; */
     --primary-foreground: oklch(1 0 0);
