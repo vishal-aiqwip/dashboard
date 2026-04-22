@@ -47,7 +47,9 @@ export function AppSidebar({
   const activeUrl = location.pathname.replace(/\/+$/, '') || '/';
 
   const activeSectionId = findActiveSectionId(activeUrl);
-  const [openSectionId, setOpenSectionId] = useState<string | null>(activeSectionId);
+  const [openSectionId, setOpenSectionId] = useState<string | null>(
+    activeSectionId ?? NAV_SECTIONS[0]?.id ?? null
+  );
   const [prevActiveSectionId, setPrevActiveSectionId] = useState<string | null>(activeSectionId);
 
   if (activeSectionId !== prevActiveSectionId) {
@@ -60,7 +62,7 @@ export function AppSidebar({
       <SidebarHeader className="border-b">
         <SidebarMenu>
           <SidebarMenuItem className=''>
-            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-0">
+            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:p-0!">
               <Link className="w-full" to="/">
                 <Logo className="w-full h-full" />
               </Link>
