@@ -9,6 +9,7 @@ import DashboardPage from '@/pages/dashboard/dashboard';
 // Lazy-loaded page components
 const DashboardLayout = lazy(() => import('@/layouts/dashboard-layout'));
 const AuthPage = lazy(() => import('@/pages/Auth'));
+const EmailPerformancePage = lazy(() => import('@/pages/email-performance'));
 
 
 function LazyPage({ children }: { children: React.ReactNode }) {
@@ -38,7 +39,10 @@ const router = createBrowserRouter([
             index: true,
             element: <LazyPage><DashboardPage /></LazyPage>
           },
-          
+          {
+            path: 'email-performance',
+            element: <LazyPage><EmailPerformancePage /></LazyPage>
+          },
         ]
       },
       
