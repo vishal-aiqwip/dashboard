@@ -35,6 +35,31 @@ export type CategoryDailyPoint = {
 export type HeatmapCell = { week: string; value: number };
 export type HeatmapRow = { label: string; cells: HeatmapCell[] };
 
+export type HotelStatus = 'active' | 'inactive' | 'never-used';
+
+export type HotelPerfRow = {
+  id: string;
+  hotel: string;
+  mailbox: string;
+  draftsCreated: number;
+  draftsSent: number;
+  sendRate: number | null;
+  sent7d: number;
+  lastSent: string | null;
+  acceptanceRate: number;
+  autoDrafts: boolean;
+  status: HotelStatus;
+  needsAttention?: boolean;
+};
+
+export type HotelStats = {
+  total: number;
+  active7d: number;
+  inactive7d: number;
+  needsAttention: number;
+  autoDraftsOn: number;
+};
+
 export type EmailRow = {
   id: string;
   sentAt: string;
@@ -90,6 +115,8 @@ export type EmailPerformanceData = {
   editDistanceByCategory: CategoryDailyPoint[];
   editDistanceHeatmap: { weeks: string[]; rows: HeatmapRow[] };
   emails: EmailRow[];
+  hotels: HotelPerfRow[];
+  hotelStats: HotelStats;
 };
 
 function daysAgo(n: number): string {
@@ -256,7 +283,337 @@ export const emailPerformanceMock: EmailPerformanceData = {
     ],
   },
   emails: buildEmailRows(),
+  hotels: buildHotelRows(),
+  hotelStats: {
+    total: 24,
+    active7d: 1,
+    inactive7d: 1,
+    needsAttention: 2,
+    autoDraftsOn: 3,
+  },
 };
+
+function buildHotelRows(): HotelPerfRow[] {
+  const baseMailbox = 'info@altekai.onmicrosoft.com';
+  const rows: HotelPerfRow[] = [
+    {
+      id: 'jacyz',
+      hotel: 'jacyz hotel',
+      mailbox: 'admin@altektest.onmicrosoft.com',
+      draftsCreated: 8,
+      draftsSent: 65,
+      sendRate: 812.5,
+      sent7d: 3,
+      lastSent: '2026-04-20T19:12:00Z',
+      acceptanceRate: 52.3,
+      autoDrafts: true,
+      status: 'active',
+    },
+    {
+      id: 'sunfield',
+      hotel: 'Sunfield',
+      mailbox: baseMailbox,
+      draftsCreated: 6,
+      draftsSent: 0,
+      sendRate: 0,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'inactive',
+      needsAttention: true,
+    },
+    {
+      id: 'ahus',
+      hotel: 'Åhus seaside',
+      mailbox: baseMailbox,
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'elsefarm',
+      hotel: 'Elsefarm (prod)',
+      mailbox: 'info@altek.ai',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'tesla-long',
+      hotel: 'testaaaaaaaaaaaaaaaaaa',
+      mailbox: 'tester.greeter.no',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'abc',
+      hotel: 'abc',
+      mailbox: baseMailbox,
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'test-mix-1',
+      hotel: 'testhotelproduct',
+      mailbox: 'moremailboxes@mail.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'test-mix-2',
+      hotel: 'testhotelproduct',
+      mailbox: 'mailbox123@gmail.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'test-mix-3',
+      hotel: 'testhotelproduct',
+      mailbox: 'test123gddddd.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'testolavshotel-1',
+      hotel: 'testolavshotel',
+      mailbox: 'test@gmail.com.md',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'joffeloff',
+      hotel: 'joffeloffe',
+      mailbox: 'joffen@altekai.onmicrosoft.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'testolav-long',
+      hotel: 'testolavshotelusemailbokseriteapens',
+      mailbox: 'hotelemailip@ai.no',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: '1off',
+      hotel: '1off',
+      mailbox: 'joffen@altekai.onmicrosoft.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'testolavshotel-2',
+      hotel: 'testolavshotel',
+      mailbox: 'agi2.z',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'test-mix-4',
+      hotel: 'testhotelproduct',
+      mailbox: 'sdfsdfjadsdfsd.ffd',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'testxhotelmailboksetaster',
+      hotel: 'testxhotelmailboksetaster',
+      mailbox: 'mailboks2gdfad.df',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: true,
+      status: 'never-used',
+      needsAttention: true,
+    },
+    {
+      id: 'mws-demo-1',
+      hotel: 'mws demo',
+      mailbox: 'demohotel@altekai.onmicrosoft.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'testolavshotel-3',
+      hotel: 'testolavshotel',
+      mailbox: 'tpl.t',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'testolavshotel-4',
+      hotel: 'testolavshotel',
+      mailbox: 'sss@mail.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'mws-demo-2',
+      hotel: 'mws demo',
+      mailbox: 'info@altekai.onmicrosoft.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: true,
+      status: 'never-used',
+      needsAttention: true,
+    },
+    {
+      id: 'testolavshotel-5',
+      hotel: 'testolavshotel',
+      mailbox: 'test@gmail.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'ahus-2',
+      hotel: 'Åhus seaside',
+      mailbox: 'joffen@altekai.onmicrosoft.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'test-mix-5',
+      hotel: 'testhotelproduct',
+      mailbox: 'udxfgdf.dsf',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+    {
+      id: 'dev-test1',
+      hotel: 'Dev-Test1',
+      mailbox: 'alys.sigx@goutlook.com',
+      draftsCreated: 0,
+      draftsSent: 0,
+      sendRate: null,
+      sent7d: 0,
+      lastSent: null,
+      acceptanceRate: 0,
+      autoDrafts: false,
+      status: 'never-used',
+    },
+  ];
+  return rows;
+}
 
 function buildEmailRows(): EmailRow[] {
   const mailbox = 'admin@altektest.onmicrosoft.com';

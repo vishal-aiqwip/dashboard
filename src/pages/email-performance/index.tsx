@@ -7,7 +7,6 @@ import {
   IconTag,
 } from '@tabler/icons-react';
 
-import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { AcceptanceRateChart } from './_components/acceptance-rate-chart';
@@ -23,22 +22,11 @@ import { EditDistanceChart } from './_components/edit-distance-chart';
 import { EditDistanceHistogram } from './_components/edit-distance-histogram';
 import { EmailsTable } from './_components/emails-table';
 import { ALL_HOTELS, HotelFilter } from './_components/hotel-filter';
+import { HotelsStatCards } from './_components/hotels-stat-cards';
+import { HotelsTable } from './_components/hotels-table';
 import { OverallSplitPie } from './_components/overall-split-pie';
 import { StatCardGrid } from './_components/stat-card-grid';
 import { emailPerformanceMock } from './_data/mock';
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <Card>
-      <CardContent className="flex min-h-60 flex-col items-center justify-center gap-2 text-center">
-        <p className="text-sm font-medium">{label} — coming soon</p>
-        <p className="text-xs text-muted-foreground">
-          This view isn&apos;t built yet. Check back shortly.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
 
 export default function EmailPerformancePage() {
   const [hotelId, setHotelId] = useState<string>(ALL_HOTELS);
@@ -111,8 +99,9 @@ export default function EmailPerformancePage() {
         <TabsContent value="emails">
           <EmailsTable emails={data.emails} />
         </TabsContent>
-        <TabsContent value="hotels">
-          <ComingSoon label="Hotels" />
+        <TabsContent value="hotels" className="flex flex-col gap-6">
+          <HotelsStatCards stats={data.hotelStats} />
+          <HotelsTable hotels={data.hotels} />
         </TabsContent>
       </Tabs>
     </div>
