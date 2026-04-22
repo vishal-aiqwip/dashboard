@@ -39,19 +39,19 @@ export function HotelSwitcher({ hotels }: HotelSwitcherProps) {
           <PopoverTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground "
+              className="group-data-[collapsible=icon]:size-9! data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               tooltip={selected.name}
             >
-              <div className="bg-sidebar-accent  text-primary flex size-9! shrink-0 items-center justify-center rounded-md ">
-                <IconBuildingSkyscraper className="size-5 " />
+              <div className="bg-sidebar-accent text-primary flex size-9 shrink-0 items-center justify-center rounded-md group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:bg-transparent">
+                <IconBuildingSkyscraper className="size-5" />
               </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
+              <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
                   Your Hotel
                 </span>
                 <span className="truncate font-medium">{selected.name}</span>
               </div>
-              <IconSelector className="ml-auto size-4 opacity-60" />
+              <IconSelector className="ml-auto size-4 opacity-60 group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </PopoverTrigger>
           <PopoverContent

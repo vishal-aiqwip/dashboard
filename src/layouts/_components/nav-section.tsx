@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 import { IconChevronDown } from '@tabler/icons-react';
 import { Link } from 'react-router';
 
@@ -15,40 +13,38 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import type { NavSectionConfig } from '@/config/sidebar-nav';
 
 type NavSectionProps = {
   section: NavSectionConfig;
   activeUrl: string;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 };
 
 function normalize(url: string) {
   return url.replace(/\/+$/, '') || '/';
 }
 
-function isItemActive(itemUrl: string, activeUrl: string) {
+export function isItemActive(itemUrl: string, activeUrl: string) {
   const n = normalize(itemUrl);
   if (!n.startsWith('/')) return false;
   if (n === '/dashboard') return activeUrl === '/dashboard';
   return activeUrl === n || activeUrl.startsWith(`${n}/`);
 }
 
-export function NavSection({ section, activeUrl }: NavSectionProps) {
-  const sectionIsActive = section.items.some((item) => isItemActive(item.url, activeUrl));
-  const [open, setOpen] = useState(sectionIsActive);
-  const [prevActive, setPrevActive] = useState(sectionIsActive);
-
-  if (sectionIsActive !== prevActive) {
-    setPrevActive(sectionIsActive);
-    if (sectionIsActive) setOpen(true);
-  }
+export function NavSection({ section, activeUrl, isOpen, onOpenChange }: NavSectionProps) {
+  const { state } = useSidebar();
+  const sidebarCollapsed = state === 'collapsed';
+  const effectiveOpen = sidebarCollapsed ? true : isOpen;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <SidebarGroup>
+    <Collapsible open={effectiveOpen} onOpenChange={onOpenChange}>
+      <SidebarGroup className="group-data-[collapsible=icon]:py-0">
         <SidebarGroupLabel asChild>
-          <CollapsibleTrigger className="group/trigger flex w-full items-center justify-between">
+          <CollapsibleTrigger className="group/trigger flex w-full items-center justify-between text-muted-foreground/70!  hover:text-black! cursor-pointer group-data-[collapsible=icon]:hidden">
             <span>{section.label}</span>
             <IconChevronDown className="size-3.5 transition-transform duration-200 group-data-[state=closed]/trigger:-rotate-90" />
           </CollapsibleTrigger>
