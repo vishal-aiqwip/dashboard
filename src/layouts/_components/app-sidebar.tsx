@@ -22,6 +22,7 @@ import { NavMain } from '@/layouts/_components/nav-main';
 import { NavUser } from '@/layouts/_components/nav-user';
 import { Bot } from 'lucide-react';
 import Logo from '@/components/logo';
+import { Separator } from 'react-resizable-panels';
 
 
 
@@ -59,7 +60,7 @@ export function AppSidebar({ user, role, onLogout, isLoggingOut = false, ...prop
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+      <SidebarHeader className='border-b'>
         <SidebarMenu>
 
           <SidebarMenuItem>
@@ -92,7 +93,9 @@ export function AppSidebar({ user, role, onLogout, isLoggingOut = false, ...prop
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+         {/* <Separator/> */}
       </SidebarHeader>
+     
       <SidebarContent>
         <NavMain items={navItems} />
       </SidebarContent>

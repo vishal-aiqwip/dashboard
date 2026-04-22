@@ -32,6 +32,7 @@ export function NavMain({
     if (normalizedUrl === '/dashboard') {
       return pathname === '/dashboard';
     }
+    
 
     return pathname === normalizedUrl || pathname.startsWith(`${normalizedUrl}/`);
   };
@@ -46,7 +47,7 @@ export function NavMain({
           {items.map((item) => (
             <SidebarMenuItem key={item.title} className=''>
               <SidebarMenuButton
-                className="h-10 group-data-[collapsible=icon]:size-10!   [&>svg]:size-6"
+                className="h-9 group-data-[collapsible=icon]:size-9!   [&>svg]:size-5"
                 tooltip={item.title}
                 asChild
                 isActive={isItemActive(item.url)}
