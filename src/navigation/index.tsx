@@ -82,7 +82,47 @@ const router = createBrowserRouter([
             ),
           },
           {
-            path: 'manage-hotels/:orgId/users',
+            path: 'manage-hotels/organizations',
+            element: (
+              <LazyPage>
+                <ManageHotelsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'manage-hotels/ai-email-access',
+            element: (
+              <LazyPage>
+                <ManageHotelsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'manage-hotels/beta-features',
+            element: (
+              <LazyPage>
+                <ManageHotelsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'manage-hotels/chatbots',
+            element: (
+              <LazyPage>
+                <ManageHotelsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'manage-hotels/security',
+            element: (
+              <LazyPage>
+                <ManageHotelsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'manage-hotels/organizations/:orgId/users',
             element: (
               <LazyPage>
                 <HotelUsersPage />

@@ -157,7 +157,7 @@ const columns: ColumnDef<OrgBrief>[] = [
     header: '',
     cell: ({ row }) => (
       <Link
-        to={`/dashboard/manage-hotels/${row.original.id}/users`}
+        to={`/dashboard/manage-hotels/organizations/${row.original.id}/users`}
         className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
         onClick={(e) => e.stopPropagation()}
       >

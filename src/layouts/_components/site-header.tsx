@@ -43,7 +43,7 @@ type Crumb =
 function useBreadcrumbs(): Crumb[] {
   const { pathname } = useLocation();
 
-  const hotelUsersMatch = pathname.match(/^\/dashboard\/manage-hotels\/([^/]+)\/users$/);
+  const hotelUsersMatch = pathname.match(/^\/dashboard\/manage-hotels\/organizations\/([^/]+)\/users$/);
   const orgId = hotelUsersMatch?.[1] ?? null;
 
   // Always call the hook — only fetches when enabled
@@ -57,8 +57,8 @@ function useBreadcrumbs(): Crumb[] {
   if (hotelUsersMatch && orgId) {
     const hotelName = orgs?.find((o) => o.id === orgId)?.name ?? orgId;
     return [
-      { type: 'link', label: 'Manage Hotels', to: '/dashboard/manage-hotels' },
-      { type: 'link', label: hotelName, to: '/dashboard/manage-hotels' },
+      { type: 'link', label: 'Manage Hotels', to: '/dashboard/manage-hotels/organizations' },
+      { type: 'link', label: hotelName, to: '/dashboard/manage-hotels/organizations' },
       { type: 'page', label: 'Users' },
     ];
   }

@@ -7,10 +7,12 @@ import {
   IconFlask,
   IconInbox,
   IconMail,
+  IconMailAi,
   IconMessageCircle,
   IconMessageChatbot,
   IconPuzzle,
   IconReport,
+  IconShieldCheck,
   IconUser,
   IconUsers,
 } from '@tabler/icons-react';
@@ -20,6 +22,7 @@ export type NavItem = {
   title: string;
   url: string;
   icon?: ComponentType<{ className?: string }>;
+  children?: NavItem[];
 };
 
 export type NavSectionConfig = {
@@ -38,7 +41,18 @@ export const NAV_SECTIONS: NavSectionConfig[] = [
     id: 'admin',
     label: 'ADMIN',
     items: [
-      { title: 'Manage Hotels', url: '/dashboard/manage-hotels', icon: IconBuildingSkyscraper },
+      {
+        title: 'Manage Hotels',
+        url: '/dashboard/manage-hotels',
+        icon: IconBuildingSkyscraper,
+        children: [
+          { title: 'Organizations', url: '/dashboard/manage-hotels/organizations', icon: IconBuildingSkyscraper },
+          { title: 'AI Email Access', url: '/dashboard/manage-hotels/ai-email-access', icon: IconMailAi },
+          { title: 'Beta Features', url: '/dashboard/manage-hotels/beta-features', icon: IconFlask },
+          { title: 'Chatbots', url: '/dashboard/manage-hotels/chatbots', icon: IconMessageChatbot },
+          { title: 'Security', url: '/dashboard/manage-hotels/security', icon: IconShieldCheck },
+        ],
+      },
       { title: 'Manage Users', url: '/dashboard/manage-users', icon: IconUsers },
       { title: 'Onboarding', url: '/dashboard/onboarding', icon: IconDeviceDesktop },
       { title: 'Email Performance', url: '/dashboard/email-performance', icon: IconChartBar },
