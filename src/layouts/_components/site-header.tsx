@@ -63,8 +63,8 @@ function useBreadcrumbs(): Crumb[] {
     ];
   }
 
-  // /dashboard/manage-hotels
-  if (pathname === '/dashboard/manage-hotels') {
+  // /dashboard/manage-hotels and all tab sub-routes
+  if (pathname.startsWith('/dashboard/manage-hotels') && !hotelUsersMatch) {
     return [{ type: 'page', label: 'Manage Hotels' }];
   }
 
