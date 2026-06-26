@@ -1,19 +1,18 @@
-import { useNavigate, useSearchParams } from "react-router";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { useEffect } from "react";
+import { useState, useEffect } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Loader, Upload } from 'lucide-react';
+import { toast } from 'sonner';
+import { updateEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import type { Value as PhoneValue } from 'react-phone-number-input';
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -21,420 +20,440 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from '@/components/ui/form';
 import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
+import { useAppDispatch, useAppSelector } from '@/redux';
+import { logout } from '@/redux/reducer/sessionReducer';
+import { userService } from '@/services/users/users';
+import { useErrorLog } from '@/hooks/use-error-log';
+import { auth } from '@/lib/firebase';
+import { PasswordInput } from '@/components/password-input';
+import { PhoneInput } from '@/components/phone-input';
 
-import { useMutation } from "@tanstack/react-query";
-import {
-  Camera,
-  MapPin,
-  Edit,
-  Loader,
-  Trash2,
-  User,
-  Building2,
-  Briefcase,
-  Phone,
-  CheckCircle2,
-  Shield
-} from "lucide-react";
-import { toast } from "sonner";
-
-import { logout, updateProfile, useAppDispatch, useAppSelector } from "@/redux";
-import { userService } from "@/services/users/users";
-import { useErrorLog } from "@/hooks/use-error-log";
-// import { useErrorLog } from "@/hooks";
-
-
-/* ---------------- Helpers ---------------- */
-const displayValue = (value: unknown): string =>
-  value === undefined || value === null || value === ""
-    ? "—"
-    : String(value);
-
-const getInitials = (profile: Record<string, unknown> | null, user: Record<string, unknown> | null) => {
-  const fname = (profile?.fname || profile?.first_name || user?.first_name) as string | undefined;
-  const lname = (profile?.lname || profile?.last_name || user?.last_name) as string | undefined;
-  if (fname || lname) {
-    return `${(fname || "").charAt(0)}${(lname || "").charAt(0)}`.toUpperCase();
+/* ---------- helpers ---------- */
+const getInitials = (firstName: string, lastName: string, email: string) => {
+  if (firstName || lastName) {
+    return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
   }
-  return (user?.username as string)?.split("@")[0]?.charAt(0)?.toUpperCase() || "U";
+  return email?.charAt(0)?.toUpperCase() || 'U';
 };
 
-const getFullName = (profile: Record<string, unknown> | null, user: Record<string, unknown> | null) => {
-  if (profile?.full_name) return profile.full_name as string;
-  const fname = (profile?.fname || user?.first_name || "") as string;
-  const lname = (profile?.lname || user?.last_name || "") as string;
-  if (fname || lname) return `${fname} ${lname}`.trim();
-  return (user?.username as string)?.split("@")[0] || "New User";
-};
-
-const calculateProfileCompletion = (profile: Record<string, unknown> | null, user: Record<string, unknown> | null) => {
-  const fields = [
-    profile?.fname || user?.first_name,
-    profile?.lname || user?.last_name,
-    profile?.company,
-    profile?.department,
-    profile?.designation,
-    profile?.location,
-    // profile?.phone || user?.phone,
-  ];
-  const filled = fields.filter(f => f && f !== "").length;
-  return Math.round((filled / fields.length) * 100);
-};
-
-/* ---------------- Validation Schema ---------------- */
-const profileSchema = z.object({
-  fname: z.string().min(1, "First name is required"),
-  lname: z.string().min(1, "Last name is required"),
-  company: z.string().optional(),
-  department: z.string().optional(),
-  designation: z.string().optional(),
-  company_role: z.string().optional(),
-  location: z.string().optional(),
-  phone: z.string().optional(),
+/* ---------- schemas ---------- */
+const infoSchema = z.object({
+  first_name: z.string().min(1, 'First name is required'),
+  last_name: z.string().min(1, 'Last name is required'),
+  phone_number: z.string().optional(),
 });
 
-/* ---------------- Info Item Component ---------------- */
-const InfoItem = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: unknown }) => (
-  <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors">
-    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-      <Icon className="h-4 w-4 text-primary" />
-    </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-      <p className="text-sm font-semibold truncate">{displayValue(value)}</p>
-    </div>
-  </div>
-);
+const emailSchema = z.object({
+  newEmail: z.email('Enter a valid email'),
+  password: z.string().min(6, 'Enter your current password'),
+});
 
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Enter your current password'),
+    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your new password'),
+  })
+  .refine((d) => d.newPassword === d.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
+
+type InfoFormValues = z.infer<typeof infoSchema>;
+type EmailFormValues = z.infer<typeof emailSchema>;
+type PasswordFormValues = z.infer<typeof passwordSchema>;
+
+/* ========================================================================== */
 const Profile = () => {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const isEditMode = searchParams.get("edit") === "true";
-
-  const handleError = useErrorLog("/profile");
+  const handleError = useErrorLog('/profile');
   const dispatch = useAppDispatch();
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
-  const { userSession } = useAppSelector((state: { session: { userSession: Record<string, unknown> | null } }) => state.session);
+  const { userSession } = useAppSelector(
+    (state: { session: { userSession: Record<string, unknown> | null } }) => state.session,
+  );
   const user = userSession?.user as Record<string, unknown> | null;
-  const profile = userSession?.profile as Record<string, unknown> | null;
-  const user_id = user?.id as string | undefined;
 
-  const profileCompletion = calculateProfileCompletion(profile, user);
-  const isProfileComplete = profileCompletion === 100;
+  /* -- fetch profile -- */
+  const { data: profileData, isLoading: profileLoading } = useQuery({
+    queryKey: ['userProfile'],
+    queryFn: () => userService.getProfile(),
+    enabled: !!user?.uid,
+  });
 
-  const form = useForm({
-    resolver: zodResolver(profileSchema),
-    values: {
-      fname: (profile?.fname || user?.first_name || "") as string,
-      lname: (profile?.lname || user?.last_name || "") as string,
-      company: (profile?.company || "") as string,
-      department: (profile?.department || "") as string,
-      designation: (profile?.designation || "") as string,
-      company_role: (profile?.company_role || "") as string,
-      location: (profile?.location || "") as string,
-      phone: (profile?.phone || user?.phone || "") as string,
-    },
+  /* -- info form -- */
+  const infoForm = useForm<InfoFormValues>({
+    resolver: zodResolver(infoSchema),
+    defaultValues: { first_name: '', last_name: '', phone_number: '' },
   });
 
   useEffect(() => {
-    form.reset({
-      fname: (profile?.fname || user?.first_name || "") as string,
-      lname: (profile?.lname || user?.last_name || "") as string,
-      company: (profile?.company || "") as string,
-      department: (profile?.department || "") as string,
-      designation: (profile?.designation || "") as string,
-      company_role: (profile?.company_role || "") as string,
-      location: (profile?.location || "") as string,
-      phone: (profile?.phone || user?.phone || "") as string,
+    // Parse Firebase displayName into first / last name as fallback
+    const firebaseDisplay = (user?.displayName as string) || auth.currentUser?.displayName || '';
+    const parts = firebaseDisplay.trim().split(/\s+/).filter(Boolean);
+    const fbFirst = parts[0] || '';
+    const fbLast = parts.slice(1).join(' ') || '';
+    const fbPhone = auth.currentUser?.phoneNumber || '';
+
+    infoForm.reset({
+      first_name: profileData?.first_name || fbFirst,
+      last_name: profileData?.last_name || fbLast,
+      phone_number: profileData?.phone_number || fbPhone,
     });
-  }, [profile, user, form]);
+  }, [profileData, user, infoForm]);
 
-  const { formState: { isSubmitting } } = form;
-
-  /* ---------------- Mutation ---------------- */
-  const updateProfileMutation = useMutation({
-    mutationFn: (payload: Record<string, unknown>) => {
-      if (!user_id) throw new Error("User not available");
-      return userService.updateProfile(user_id, payload);
-    },
-
-    onSuccess: (response) => {
-      const updatedProfile = response as Record<string, unknown>;
-
-      dispatch(updateProfile(updatedProfile));
-      setSearchParams({ edit: "false" });
-      toast.success("Profile updated successfully");
-    },
-
-    onError: (error) => {
-      handleError(error);
-    },
+  const updateInfoMutation = useMutation({
+    mutationFn: (payload: InfoFormValues) => userService.updateUserProfile(payload),
+    onSuccess: () => toast.success('Profile updated successfully'),
+    onError: (error) => handleError(error),
   });
 
-  const onSubmit = async (data: Record<string, unknown>) => {
-    updateProfileMutation.mutateAsync(data);
-  };
+  /* -- email form -- */
+  const emailForm = useForm<EmailFormValues>({
+    resolver: zodResolver(emailSchema),
+    defaultValues: { newEmail: '', password: '' },
+  });
 
-  /* ---------------- Delete Account Mutation ---------------- */
-  const deleteAccountMutation = useMutation({
-    mutationFn: () => {
-      if (!user_id) throw new Error("User not available");
-      return userService.deleteUser(user_id);
+  const updateEmailMutation = useMutation({
+    mutationFn: async ({ newEmail, password }: EmailFormValues) => {
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.email) throw new Error('Not authenticated');
+      const credential = EmailAuthProvider.credential(currentUser.email, password);
+      await reauthenticateWithCredential(currentUser, credential);
+      await updateEmail(currentUser, newEmail);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
+      toast.success('Email updated. Please log in again with your new email.');
+      setEmailDialogOpen(false);
+      emailForm.reset();
       dispatch(logout());
-      navigate("/", { replace: true });
     },
-    onError: (error) => {
-      handleError(error);
+    onError: (error: unknown) => {
+      const code = (error as { code?: string }).code;
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        emailForm.setError('password', { message: 'Incorrect password' });
+      } else if (code === 'auth/email-already-in-use') {
+        emailForm.setError('newEmail', { message: 'Email already in use' });
+      } else {
+        toast.error('Failed to update email. Please try again.');
+      }
     },
   });
+
+  /* -- password form -- */
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
+  });
+
+  const updatePasswordMutation = useMutation({
+    mutationFn: async ({ currentPassword, newPassword }: PasswordFormValues) => {
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.email) throw new Error('Not authenticated');
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, newPassword);
+    },
+    onSuccess: () => {
+      toast.success('Password updated successfully');
+      setPasswordDialogOpen(false);
+      passwordForm.reset();
+    },
+    onError: (error: unknown) => {
+      const code = (error as { code?: string }).code;
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        passwordForm.setError('currentPassword', { message: 'Incorrect password' });
+      } else {
+        toast.error('Failed to update password. Please try again.');
+      }
+    },
+  });
+
+  const firstName = profileData?.first_name || '';
+  const lastName = profileData?.last_name || '';
+  const email = (user?.email as string) || profileData?.email || '';
 
   return (
-      <div className="p-4 md:p-6 space-y-6 ">
+    <div className="p-6 md:p-8">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className=''>Profile Settings</CardTitle>
+          <CardDescription>
+            Manage your profile information and preferences.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          
 
-        {/* ---------- Profile Header Card ---------- */}
-        <Card className="relative overflow-hidden ">
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-30">
-            <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+          {/* Photo row */}
+          <div className="mt-8 flex items-center gap-5">
+            <Avatar className="h-16 w-16 border">
+              <AvatarImage src={profileData?.photoURL ?? undefined} />
+              <AvatarFallback className="text-xl font-semibold bg-muted">
+                {profileLoading ? '…' : getInitials(firstName, lastName, email)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <p className="text-sm font-medium">Profile photo</p>
+              <p className="text-xs text-muted-foreground">JPG, PNG or WEBP. Max 5 MB.</p>
+            </div>
+            <Button variant="outline" size="icon" className="rounded-full shrink-0">
+              <Upload className="h-4 w-4" />
+            </Button>
           </div>
 
-          <CardContent className="relative p-6 md:p-8">
-            <div className="flex flex-col md:flex-row gap-6 md:items-center">
-              {/* Avatar Section */}
-              <div className="relative group">
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary to-primary/50 opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
-                <Avatar className="h-28 w-28 md:h-32 md:w-32 border-4 border-background shadow-xl">
-                  <AvatarImage src={user?.profile_image as string} />
-                  <AvatarFallback className="text-3xl font-bold bg-primary/20">
-                    {getInitials(profile, user)}
-                  </AvatarFallback>
-                </Avatar>
-                {isEditMode && (
-                  <button
-                    className="absolute -right-1 -bottom-1 h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg cursor-pointer hover:bg-primary/90 transition-colors"
-                  >
-                    <Camera className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+          <Separator className="my-6" />
 
-              {/* Info Section */}
-              <div className="flex-1 space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center gap-3">
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-bold capitalize">
-                      {getFullName(profile, user)}
-                    </h1>
-                    <p className="text-muted-foreground text-sm mt-1">{user?.username as string}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Badge
-                      variant={user?.is_active ? "default" : "secondary"}
-                      className={user?.is_active ? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20" : ""}
-                    >
-                      {user?.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                    <Badge variant="outline" className="gap-1">
-                      {isProfileComplete ? (
-                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                      ) : (
-                        <Shield className="h-3 w-3" />
-                      )}
-                      {isProfileComplete ? "Verified" : "Incomplete"}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Profile Completion */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Profile Completion</span>
-                    <span className="font-semibold">{profileCompletion}%</span>
-                  </div>
-                  <Progress
-                    value={profileCompletion}
-                    className="h-2"
+          {/* Info form */}
+          {profileLoading ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader className="h-4 w-4 animate-spin" />
+              Loading profile…
+            </div>
+          ) : (
+            <Form {...infoForm}>
+              <form
+                onSubmit={infoForm.handleSubmit((d) => updateInfoMutation.mutate(d))}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={infoForm.control}
+                    name="first_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="First name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={infoForm.control}
+                    name="last_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Last name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-              </div>
 
-              {/* Action Button */}
-              <div className="flex-shrink-0">
-                {isEditMode ? (
-                  ""
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={() => navigate("/dashboard/profile?edit=true")}
-                    className="gap-2"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Edit Profile
+                <FormField
+                  control={infoForm.control}
+                  name="phone_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone (optional)</FormLabel>
+                      <FormControl>
+                        <PhoneInput
+                          placeholder="Enter phone number"
+                          value={field.value as PhoneValue}
+                          onChange={(val) => field.onChange(val ?? '')}
+                          defaultCountry="US"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end pt-1">
+                  <Button type="submit" disabled={updateInfoMutation.isPending}>
+                    {updateInfoMutation.isPending && (
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Update info
                   </Button>
-                )}
-              </div>
+                </div>
+              </form>
+            </Form>
+          )}
+
+          <Separator className="my-6" />
+
+          {/* Email + Password */}
+          <div className="grid grid-cols-2 divide-x">
+            <div className="pr-8 space-y-2">
+              <p className="text-xs text-muted-foreground">Current email</p>
+              <p className="text-sm font-medium break-all">{email}</p>
+              <Button variant="outline" size="sm" onClick={() => setEmailDialogOpen(true)}>
+                Update email
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+            <div className="pl-8 space-y-2">
+              <p className="text-xs text-muted-foreground">Password</p>
+              <p className="text-sm tracking-widest text-muted-foreground">••••••••</p>
+              <Button variant="outline" size="sm" onClick={() => setPasswordDialogOpen(true)}>
+                Update password
+              </Button>
+            </div>
+          </div>
 
-        {/* ---------- Profile Details Card ---------- */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile Details</CardTitle>
-            <CardDescription>Update your personal and work information</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            {isEditMode ? (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      ["fname", "First Name"],
-                      ["lname", "Last Name"],
-                      ["company", "Company"],
-                      ["department", "Department"],
-                      ["designation", "Designation"],
-                      ["company_role", "Company Role"],
-                      ["phone", "Phone"],
-                      ["location", "Location"],
-                    ].map(([name, label]) => (
-                      <FormField
-                        key={name}
-                        control={form.control}
-                        name={name as "fname" | "lname" | "company" | "department" | "designation" | "company_role" | "phone" | "location"}
-                        render={({ field }) => (
-                          <FormItem className={name === "location" ? "md:col-span-2" : ""}>
-                            <FormLabel>{label}</FormLabel>
-                            <FormControl>
-                              <Input
-                                autoComplete="off"
-                                placeholder={`Enter ${label?.toLowerCase()}`}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-5">
-                    <Button type="button" variant="outline" onClick={() => navigate("/dashboard/profile")}>
+          {/* Password update dialog */}
+          <Dialog
+            open={passwordDialogOpen}
+            onOpenChange={(open) => {
+              setPasswordDialogOpen(open);
+              if (!open) passwordForm.reset();
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update password</DialogTitle>
+                <DialogDescription>
+                  Enter your current password, then choose a new one.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...passwordForm}>
+                <form
+                  onSubmit={passwordForm.handleSubmit((d) => updatePasswordMutation.mutate(d))}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={passwordForm.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current password</FormLabel>
+                        <FormControl>
+                          <PasswordInput placeholder="Current password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={passwordForm.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New password</FormLabel>
+                        <FormControl>
+                          <PasswordInput placeholder="New password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={passwordForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm new password</FormLabel>
+                        <FormControl>
+                          <PasswordInput placeholder="Repeat new password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setPasswordDialogOpen(false);
+                        passwordForm.reset();
+                      }}
+                    >
                       Cancel
                     </Button>
-
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting || updateProfileMutation.isPending}
-                    >
-                      {(isSubmitting || updateProfileMutation.isPending) && (
+                    <Button type="submit" disabled={updatePasswordMutation.isPending}>
+                      {updatePasswordMutation.isPending && (
                         <Loader className="mr-2 h-4 w-4 animate-spin" />
                       )}
-                      Save Profile
+                      Update password
                     </Button>
-                  </div>
+                  </DialogFooter>
                 </form>
               </Form>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InfoItem icon={User} label="First Name" value={profile?.fname || user?.first_name} />
-                <InfoItem icon={User} label="Last Name" value={profile?.lname || user?.last_name} />
-                <InfoItem icon={Building2} label="Company" value={profile?.company || "—"} />
-                <InfoItem icon={Briefcase} label="Department" value={profile?.department || "—"} />
-                <InfoItem icon={Briefcase} label="Designation" value={profile?.designation || "—"} />
-                <InfoItem icon={User} label="Company Role" value={profile?.company_role || "—"} />
-                <InfoItem icon={Phone} label="Phone" value={profile?.phone || user?.phone} />
-                <InfoItem icon={MapPin} label="Location" value={profile?.location || "Not specified"} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </DialogContent>
+          </Dialog>
 
-        {/* ---------- Danger Zone ---------- */}
-        <Card className="border-destructive/20 bg-destructive/5">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-destructive text-base flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Danger Zone
-            </CardTitle>
-            <CardDescription className="text-destructive/70">
-              Irreversible and destructive actions
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-base">Delete Account</Label>
-                <p className="text-muted-foreground text-sm">
-                  Permanently delete your account and all data
-                </p>
-              </div>
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    disabled={deleteAccountMutation.isPending}
-                  >
-                    {deleteAccountMutation.isPending ? (
-                      <Loader className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
+          {/* Email update dialog */}
+          <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update email</DialogTitle>
+                <DialogDescription>
+                  Enter your new email and current password to confirm the change.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...emailForm}>
+                <form
+                  onSubmit={emailForm.handleSubmit((d) => updateEmailMutation.mutate(d))}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={emailForm.control}
+                    name="newEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="you@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                    Delete Account
-                  </Button>
-                </AlertDialogTrigger>
-
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Are you absolutely sure?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete your account
-                      and remove all associated data from our servers.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={() => deleteAccountMutation.mutate()}
-                      disabled={deleteAccountMutation.isPending}
+                  />
+                  <FormField
+                    control={emailForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Enter your password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setEmailDialogOpen(false);
+                        emailForm.reset();
+                      }}
                     >
-                      {deleteAccountMutation.isPending ? "Deleting..." : "Yes, delete account"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-
-            </div>
-          </CardContent>
-        </Card>
-
-      </div>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={updateEmailMutation.isPending}>
+                      {updateEmailMutation.isPending && (
+                        <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Update email
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

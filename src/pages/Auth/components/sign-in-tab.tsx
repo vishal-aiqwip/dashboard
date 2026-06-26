@@ -13,20 +13,18 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
+  FormMessage,
 } from '@/components/ui/form';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from '@/components/ui/input-group';
-import { useErrorLog } from '@/hooks/use-error-log';
-import { logger } from '@/lib/logger';
 import { authService } from '@/services/auth/auth';
 
 const signInSchema = z.object({
   email: z.email().min(1),
-  password: z.string().min(6)
+  password: z.string().min(6),
 });
 
 type SignInFormValues = z.infer<typeof signInSchema>;
@@ -34,25 +32,17 @@ type SignInFormValues = z.infer<typeof signInSchema>;
 export const SignInTab = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const handleError = useErrorLog('/auth?tab=signin');
 
   const form = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
-    defaultValues: {
-      email: '',
-      password: ''
-    }
+    defaultValues: { email: '', password: '' },
   });
 
   const loginMutation = useMutation({
     mutationFn: (data: SignInFormValues) =>
-      authService.login({
-        username: data.email,
-        password: data.password
-      }),
+      authService.login(data.email, data.password),
 
-    onSuccess: (responseData) => {
-      logger.info('Login successful for:', responseData.user.username);
+    onSuccess: () => {
       const redirectTo = searchParams.get('from') || '/dashboard';
       navigate(redirectTo, { replace: true });
       loginMutation.reset();
@@ -61,20 +51,15 @@ export const SignInTab = () => {
     onError: (error) => {
       const message = error instanceof Error ? error.message : 'Invalid email or password';
       form.setError('root', { message });
-      handleError(error);
       loginMutation.reset();
-    }
+    },
   });
 
   const isSubmitting = loginMutation.isPending;
 
-  const onSubmit = (data: SignInFormValues) => {
-    loginMutation.mutate(data);
-  };
-
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={form.handleSubmit((data) => loginMutation.mutate(data))} className="space-y-5">
         <FormField
           control={form.control}
           name="email"
@@ -89,7 +74,7 @@ export const SignInTab = () => {
                   <InputGroupInput
                     type="email"
                     placeholder="you@example.com"
-                    autoComplete="email webauthn"
+                    autoComplete="email"
                     {...field}
                   />
                 </InputGroup>
@@ -116,7 +101,7 @@ export const SignInTab = () => {
               <FormControl>
                 <PasswordInput
                   placeholder="Enter your password"
-                  autoComplete="current-password webauthn"
+                  autoComplete="current-password"
                   {...field}
                 />
               </FormControl>
@@ -130,12 +115,12 @@ export const SignInTab = () => {
             {form.formState.errors.root.message}
           </p>
         )}
+        
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting && <Loader className="mr-2 size-4 animate-spin" />}
           {isSubmitting ? 'Signing in...' : 'Sign in'}
         </Button>
-
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <span className="border-border w-full border-t" />
@@ -177,13 +162,6 @@ export const SignInTab = () => {
             Microsoft
           </Button>
         </div>
-
-        <p className="text-muted-foreground text-center text-sm">
-          Don&apos;t have an account?{' '}
-          <Link to="/?tab=signup" className="text-primary font-medium hover:underline">
-            Sign up
-          </Link>
-        </p>
       </form>
     </Form>
   );

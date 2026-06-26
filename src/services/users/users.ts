@@ -99,6 +99,33 @@ export const userService = {
     }
   },
 
+  getProfile: async (): Promise<{
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone_number: string | null;
+    photoURL: string | null;
+  }> => {
+    try {
+      const { data } = await axiosApi.get('/user/profile');
+      return data;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to fetch profile'));
+    }
+  },
+
+  updateUserProfile: async (payload: {
+    first_name: string;
+    last_name: string;
+    phone_number?: string;
+  }): Promise<void> => {
+    try {
+      await axiosApi.put('/user/profile', payload);
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to update profile'));
+    }
+  },
+
   setUserRole: async (
     userId: string,
     role: 'admin' | 'user'

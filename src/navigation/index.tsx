@@ -6,54 +6,95 @@ import GuestRoute from './guest-route';
 import ProtectedRoute from './protected-route';
 import DashboardPage from '@/pages/dashboard/dashboard';
 
-// Lazy-loaded page components
 const DashboardLayout = lazy(() => import('@/layouts/dashboard-layout'));
 const AuthPage = lazy(() => import('@/pages/Auth'));
 const EmailPerformancePage = lazy(() => import('@/pages/email-performance'));
-
+const ProfilePage = lazy(() => import('@/pages/Profile'));
+const ManageHotelsPage = lazy(() => import('@/pages/manage-hotels'));
+const HotelUsersPage = lazy(() => import('@/pages/manage-hotels/hotel-users'));
 
 function LazyPage({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={<div className="flex h-full items-center justify-center min-h-[90vh]"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center min-h-[90vh]">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      }
+    >
       {children}
     </Suspense>
   );
 }
 
-/**
- * Routes configuration
- */
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <GuestRoute><LazyPage><AuthPage /></LazyPage></GuestRoute>
+    element: (
+      <GuestRoute>
+        <LazyPage>
+          <AuthPage />
+        </LazyPage>
+      </GuestRoute>
+    ),
   },
   {
-    // element: <ProtectedRoute />,
+    element: <ProtectedRoute />,
     children: [
       {
         path: '/dashboard',
-        element: <LazyPage><DashboardLayout /></LazyPage>,
+        element: (
+          <LazyPage>
+            <DashboardLayout />
+          </LazyPage>
+        ),
         children: [
           {
             index: true,
-            element: <LazyPage><DashboardPage /></LazyPage>
+            element: (
+              <LazyPage>
+                <DashboardPage />
+              </LazyPage>
+            ),
           },
           {
             path: 'email-performance',
-            element: <LazyPage><EmailPerformancePage /></LazyPage>
+            element: (
+              <LazyPage>
+                <EmailPerformancePage />
+              </LazyPage>
+            ),
           },
-        ]
+          {
+            path: 'profile',
+            element: (
+              <LazyPage>
+                <ProfilePage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'manage-hotels',
+            element: (
+              <LazyPage>
+                <ManageHotelsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'manage-hotels/:orgId/users',
+            element: (
+              <LazyPage>
+                <HotelUsersPage />
+              </LazyPage>
+            ),
+          },
+        ],
       },
-      
-    ]
-  }
+    ],
+  },
 ]);
 
-/**
- * @file index.tsx
- * @description Main router
- */
 export default function AppRouter() {
   return <RouterProvider router={router} />;
 }

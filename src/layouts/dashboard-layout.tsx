@@ -21,8 +21,6 @@ export default function DashboardLayout() {
 
   const { userSession } = useAppSelector((state: any) => state.session);
 
-  console.log(userSession, "---------usersession-------")
-
   const logoutMutation = useMutation({
     mutationFn: () => authService.logout(),
     onSuccess: () => {
@@ -36,9 +34,9 @@ export default function DashboardLayout() {
   });
 
   const sidebarUser = {
-    full_name: userSession?.profile?.full_name ?? null,
-    email: userSession?.user.username,
-    avatar_url: userSession?.profile?.photo ?? null,
+    full_name: userSession?.user?.displayName ?? null,
+    email: userSession?.user?.email ?? null,
+    avatar_url: null,
   };
 
   return (

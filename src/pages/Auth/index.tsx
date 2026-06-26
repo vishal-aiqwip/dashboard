@@ -6,22 +6,18 @@ import { CONFIG } from '@/config';
 
 import { ForgotPasswordTab } from './components/forgot-password-tab';
 import { SignInTab } from './components/sign-in-tab';
-import { ResetPasswordTab } from './components/reset-password-tab';
-import { SignUpTab } from './components/sign-up-tab';
 
 const AuthPage = () => {
   const [searchParams] = useSearchParams();
   const rawTab = searchParams.get('tab') || 'signin';
   const normalizedTab = rawTab.split('?')[0];
-  const tab = ['signin', 'signup', 'forgot-password', 'reset-password'].includes(normalizedTab)
+  const tab = ['signin', 'forgot-password'].includes(normalizedTab)
     ? normalizedTab
     : 'signin';
 
   const titles: Record<string, { heading: string; sub: string }> = {
     signin: { heading: 'Welcome back', sub: 'Enter your credentials to access your account' },
-    signup: { heading: 'Create account', sub: 'Get started with your free account' },
     'forgot-password': { heading: 'Forgot password', sub: "We'll send you a reset link" },
-    'reset-password': { heading: 'New password', sub: 'Choose a strong password for your account' },
   };
 
   const { heading, sub } = titles[tab] || titles.signin;
@@ -30,7 +26,7 @@ const AuthPage = () => {
     <div className="flex min-h-dvh w-full">
       {/* Left: form panel */}
       <div className="flex w-full items-center justify-center bg-background px-6 py-12 lg:w-3/5">
-        <div className="w-full max-w-md  [&_[data-slot=form-control]]:h-11! [&_[data-slot=input-group]]:h-11! [&_form>button]:h-11 [&_form>div>button]:h-11">
+        <div className="w-full max-w-md [&_[data-slot=form-control]]:h-11! [&_[data-slot=input-group]]:h-11! [&_form>button]:h-11 [&_form>div>button]:h-11">
           <Link to="/" className="inline-flex items-center" aria-label={CONFIG.APP_NAME}>
             <img src={LogoSvg} alt={CONFIG.APP_NAME} className="h-8 w-auto" />
           </Link>
@@ -45,14 +41,8 @@ const AuthPage = () => {
               <TabsContent value="signin" className="mt-0">
                 <SignInTab />
               </TabsContent>
-              <TabsContent value="signup" className="mt-0">
-                <SignUpTab />
-              </TabsContent>
               <TabsContent value="forgot-password" className="mt-0">
                 <ForgotPasswordTab />
-              </TabsContent>
-              <TabsContent value="reset-password" className="mt-0">
-                <ResetPasswordTab />
               </TabsContent>
             </Tabs>
           </div>
