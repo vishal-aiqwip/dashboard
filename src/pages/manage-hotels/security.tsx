@@ -1,178 +1,279 @@
-import { useState } from 'react';
-import { IconShieldCheck } from '@tabler/icons-react';
+import { useMemo, useState } from 'react';
+import { type ColumnDef } from '@tanstack/react-table';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { ShieldCheck, ShieldOff, Loader } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DataTable } from '@/components/data-table/data-table';
+import { securityService } from '@/services/security/security';
+import { organizationService, type OrgBrief } from '@/services/organizations/organizations';
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="p-4">
-      <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
-    </Card>
-  );
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type OrgMFARow = {
+  org: OrgBrief;
+  require2fa: boolean;
+};
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SecurityPage() {
-  const [twoFactor, setTwoFactor] = useState(false);
-  const [sessionTimeout, setSessionTimeout] = useState('60');
-  const [passwordExpiry, setPasswordExpiry] = useState('90');
-  const [ipWhitelist, setIpWhitelist] = useState(false);
-  const [auditLog, setAuditLog] = useState(true);
-  const [loginAlerts, setLoginAlerts] = useState(true);
+  const qc = useQueryClient();
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const [pending, setPending] = useState<Set<string>>(new Set());
 
-  const handleSave = () => {
-    toast.success('Security settings saved');
+  // ── Single query: fetch all orgs + their MFA settings in parallel ──
+  const { data: tableData = [], isLoading, error } = useQuery<OrgMFARow[]>({
+    queryKey: ['security-orgs-mfa'],
+    queryFn: async () => {
+      const orgs = await organizationService.listAll();
+      const rows = await Promise.all(
+        orgs.map(async (org) => {
+          try {
+            const { require_2fa } = await securityService.getMFASettings(org.id);
+            return { org, require2fa: require_2fa };
+          } catch {
+            return { org, require2fa: false };
+          }
+        }),
+      );
+      return rows;
+    },
+    staleTime: 60_000,
+  });
+
+  // ── Mutation ──
+  const mfaMutation = useMutation({
+    mutationFn: ({ orgId, require2fa }: { orgId: string; require2fa: boolean }) =>
+      securityService.updateMFASettings(orgId, require2fa),
+    onSuccess: (result, { orgId, require2fa }) => {
+      toast.success(
+        `MFA ${require2fa ? 'enabled' : 'disabled'} — ${result.users_updated} user${result.users_updated === 1 ? '' : 's'} affected`,
+      );
+      qc.setQueryData<OrgMFARow[]>(['security-orgs-mfa'], (prev) =>
+        prev?.map((r) => (r.org.id === orgId ? { ...r, require2fa } : r)) ?? [],
+      );
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to update MFA settings'),
+  });
+
+  const handleToggle = (orgId: string, require2fa: boolean) => {
+    setPending((p) => new Set(p).add(orgId));
+    mfaMutation.mutate(
+      { orgId, require2fa },
+      {
+        onSettled: () =>
+          setPending((p) => {
+            const n = new Set(p);
+            n.delete(orgId);
+            return n;
+          }),
+      },
+    );
   };
+
+  // ── Selected rows ──
+  const selectedRows = useMemo(
+    () => tableData.filter((row) => rowSelection[row.org.id] === true),
+    [tableData, rowSelection],
+  );
+  const someSelected = selectedRows.length > 0;
+
+  const handleBulkEnable = () =>
+    selectedRows.forEach((row) => {
+      if (!row.require2fa) handleToggle(row.org.id, true);
+    });
+
+  const handleBulkDisable = () =>
+    selectedRows.forEach((row) => {
+      if (row.require2fa) handleToggle(row.org.id, false);
+    });
+
+  // ── Stats ──
+  const mfaEnabledCount = tableData.filter((r) => r.require2fa).length;
+
+  // ── Column defs ──
+  const columns = useMemo<ColumnDef<OrgMFARow>[]>(
+    () => [
+      {
+        id: 'select',
+        size: 40,
+        enableSorting: false,
+        header: ({ table }) => (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(v) => row.toggleSelected(!!v)}
+            aria-label={`Select ${row.original.org.name}`}
+          />
+        ),
+      },
+      {
+        id: 'organization',
+        accessorFn: (r) => r.org.name,
+        header: 'Organization',
+        size: 360,
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.org.name}</span>
+        ),
+      },
+      {
+        id: 'mfa',
+        size: 180,
+        enableSorting: false,
+        header: () => <span className="flex justify-center">MFA Required</span>,
+        cell: ({ row }) => {
+          const { org, require2fa } = row.original;
+          const isPending = pending.has(org.id);
+          return (
+            <div className="flex items-center justify-center gap-2">
+              <Badge variant={require2fa ? 'default' : 'secondary'} className="text-xs w-16 justify-center">
+                {require2fa ? 'On' : 'Off'}
+              </Badge>
+              <Switch
+                checked={require2fa}
+                disabled={isPending}
+                onCheckedChange={(enabled) => handleToggle(org.id, enabled)}
+              />
+            </div>
+          );
+        },
+      },
+    ],
+    [pending],
+  );
+
+  if (error) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-6">
+        <h2 className="text-2xl font-semibold">Security</h2>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <p className="text-red-600">Error loading security settings: {(error as Error).message}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-md bg-muted">
-              <IconShieldCheck className="size-4 text-muted-foreground" />
+      <div>
+        <h2 className="text-2xl font-semibold">Security</h2>
+        <p className="text-sm text-muted-foreground">
+          Manage two-factor authentication requirements per organization. Select multiple organizations to bulk-enable or disable MFA.
+        </p>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid gap-4 grid-cols-3">
+        <Card>
+          <CardContent className="p-0 px-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                <ShieldCheck className="h-5 w-5 text-blue-600" />
+              </div>
+              <span className="text-sm font-medium">MFA Enabled</span>
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight">Security</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Configure platform-wide security policies and access controls.
-          </p>
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant={mfaEnabledCount > 0 ? 'default' : 'secondary'} className="text-xs">
+                {mfaEnabledCount}/{tableData.length} organizations
+              </Badge>
+              {tableData.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {Math.round((mfaEnabledCount / tableData.length) * 100)}%
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-0 px-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                <ShieldOff className="h-5 w-5 text-blue-600" />
+              </div>
+              <span className="text-sm font-medium">MFA Disabled</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="secondary" className="text-xs">
+                {tableData.length - mfaEnabledCount}/{tableData.length} organizations
+              </Badge>
+              {tableData.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {Math.round(((tableData.length - mfaEnabledCount) / tableData.length) * 100)}%
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center gap-2  text-sm text-muted-foreground">
+          <Loader className="h-4 w-4 animate-spin" />
+          Loading security settings…
         </div>
-        <Button onClick={handleSave}>Save Changes</Button>
-      </div>
+      )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="2FA Status" value={twoFactor ? 'Enforced' : 'Optional'} />
-        <StatCard label="Session Timeout" value={`${sessionTimeout} min`} />
-        <StatCard label="Password Expiry" value={`${passwordExpiry} days`} />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Authentication */}
+      {!isLoading && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Authentication</CardTitle>
-            <CardDescription>Control how users sign in to the platform.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Enforce Two-Factor Authentication</Label>
-                <p className="text-xs text-muted-foreground">
-                  Require all users to set up 2FA before accessing the dashboard.
-                </p>
-              </div>
-              <Switch checked={twoFactor} onCheckedChange={setTwoFactor} />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Login Alerts</Label>
-                <p className="text-xs text-muted-foreground">
-                  Email admins when a new device logs in.
-                </p>
-              </div>
-              <Switch checked={loginAlerts} onCheckedChange={setLoginAlerts} />
-            </div>
+          <CardContent>
+            <DataTable
+              columns={columns}
+              data={tableData}
+              filterPlaceholder="Filter organizations..."
+              emptyMessage="No organizations found."
+              enableGlobalFilter={true}
+              enablePagination={false}
+              rowSelection={rowSelection}
+              onRowSelectionChange={setRowSelection}
+              getRowId={(row) => row.org.id}
+              enableRowSelection={true}
+              toolbarContent={
+                someSelected ? (
+                  <>
+                    <Badge className="text-sm">{selectedRows.length} selected</Badge>
+                    <div className="h-5 w-px bg-border" />
+                    <span className="text-xs font-medium text-muted-foreground">MFA</span>
+                    <Button
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={handleBulkEnable}
+                      disabled={mfaMutation.isPending}
+                    >
+                      Enable
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
+                      onClick={handleBulkDisable}
+                      disabled={mfaMutation.isPending}
+                    >
+                      Disable
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setRowSelection({})}>
+                      Clear
+                    </Button>
+                  </>
+                ) : undefined
+              }
+            />
           </CardContent>
         </Card>
-
-        {/* Session */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Session Management</CardTitle>
-            <CardDescription>Configure how user sessions are handled.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Session Timeout (minutes)</Label>
-              <Select value={sessionTimeout} onValueChange={setSessionTimeout}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15">15 minutes</SelectItem>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="60">60 minutes</SelectItem>
-                  <SelectItem value="120">2 hours</SelectItem>
-                  <SelectItem value="480">8 hours</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Password Policy */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Password Policy</CardTitle>
-            <CardDescription>Set minimum password requirements for all accounts.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Password Expiry (days)</Label>
-              <Select value={passwordExpiry} onValueChange={setPasswordExpiry}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 days</SelectItem>
-                  <SelectItem value="60">60 days</SelectItem>
-                  <SelectItem value="90">90 days</SelectItem>
-                  <SelectItem value="180">180 days</SelectItem>
-                  <SelectItem value="never">Never</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Access Control */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Access Control</CardTitle>
-            <CardDescription>Restrict platform access by network or IP.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">IP Allowlist</Label>
-                <p className="text-xs text-muted-foreground">
-                  Only allow logins from specific IP addresses.
-                </p>
-              </div>
-              <Switch checked={ipWhitelist} onCheckedChange={setIpWhitelist} />
-            </div>
-            {ipWhitelist && (
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Allowed IPs</Label>
-                <Input placeholder="e.g. 192.168.1.0/24, 10.0.0.1" />
-                <p className="text-xs text-muted-foreground">Comma-separated CIDR ranges or IPs.</p>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Audit Log</Label>
-                <p className="text-xs text-muted-foreground">
-                  Record all admin actions for compliance.
-                </p>
-              </div>
-              <Switch checked={auditLog} onCheckedChange={setAuditLog} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }

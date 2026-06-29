@@ -42,6 +42,7 @@ interface DataTableProps<TData, TValue> {
   enableGlobalFilter?: boolean;
   enableColumnVisibilityToggle?: boolean;
   enablePagination?: boolean;
+  toolbarContent?: React.ReactNode;
   // External row selection control (opt-in)
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
@@ -57,6 +58,7 @@ export function DataTable<TData, TValue>({
   enableGlobalFilter = true,
   enableColumnVisibilityToggle = false,
   enablePagination = true,
+  toolbarContent,
   rowSelection: externalRowSelection,
   onRowSelectionChange,
   getRowId,
@@ -102,6 +104,7 @@ export function DataTable<TData, TValue>({
             </InputGroupAddon>
           </InputGroup>
         )}
+        {toolbarContent && <div className="flex items-center gap-2">{toolbarContent}</div>}
         {enableColumnVisibilityToggle && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
