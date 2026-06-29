@@ -63,7 +63,21 @@ function useBreadcrumbs(): Crumb[] {
     ];
   }
 
-  // /dashboard/manage-hotels and all tab sub-routes
+  // Named manage-hotels sub-pages
+  const manageHotelsSubPages: Record<string, string> = {
+    '/dashboard/manage-hotels/ai-email-access': 'AI Email Access',
+    '/dashboard/manage-hotels/beta-features': 'Beta Features',
+    '/dashboard/manage-hotels/chatbots': 'Chatbots',
+    '/dashboard/manage-hotels/security': 'Security',
+  };
+  if (manageHotelsSubPages[pathname]) {
+    return [
+      { type: 'link', label: 'Manage Hotels', to: '/dashboard/manage-hotels' },
+      { type: 'page', label: manageHotelsSubPages[pathname] },
+    ];
+  }
+
+  // /dashboard/manage-hotels and all other sub-routes
   if (pathname.startsWith('/dashboard/manage-hotels') && !hotelUsersMatch) {
     return [{ type: 'page', label: 'Manage Hotels' }];
   }
