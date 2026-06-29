@@ -211,6 +211,7 @@ export default function AiEmailAccessPage() {
     onSuccess: () => {
       toast.success('Tenant policy saved');
       qc.invalidateQueries({ queryKey: ['ai-email', 'tenants'] });
+      setPolicyDialogOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -273,7 +274,7 @@ export default function AiEmailAccessPage() {
         scope_id: v.orgId,
         role: v.memberRole,
       });
-      await updatePolicyMutation.mutateAsync({
+      await aiEmailAccessService.updateTenantPolicy({
         tenant_id: selectedTenant.id,
         status: desiredStatus,
         auto_link: v.tenantAutoLink,
@@ -673,10 +674,7 @@ export default function AiEmailAccessPage() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => {
-                    onSavePolicyOnly();
-                    setPolicyDialogOpen(false);
-                  }}
+                  onClick={onSavePolicyOnly}
                   disabled={updatePolicyMutation.isPending}
                 >
                   {updatePolicyMutation.isPending && <Loader className="mr-2 size-4 animate-spin" />}

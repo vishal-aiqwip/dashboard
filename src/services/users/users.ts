@@ -37,7 +37,7 @@ export const userService = {
     is_active?: boolean;
   }): Promise<UserListResponse> => {
     try {
-      const { data } = await axiosApi.get<ApiResponse<UserListResponse>>('/user/', { params });
+      const { data } = await axiosApi.get<ApiResponse<UserListResponse>>('/api/user/', { params });
       return requireData(data, 'Failed to fetch users');
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to fetch users'));
@@ -46,7 +46,7 @@ export const userService = {
 
   createUser: async (payload: CreateUserPayload): Promise<UserData> => {
     try {
-      const { data } = await axiosApi.post<ApiResponse<UserData>>('/user/', payload);
+      const { data } = await axiosApi.post<ApiResponse<UserData>>('/api/user/', payload);
       return requireData(data, 'Failed to create user');
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to create user'));
@@ -55,7 +55,7 @@ export const userService = {
 
   getUser: async (userId: string): Promise<UserData> => {
     try {
-      const { data } = await axiosApi.get<ApiResponse<UserData>>(`/user/${userId}`);
+      const { data } = await axiosApi.get<ApiResponse<UserData>>(`/api/user/${userId}`);
       return requireData(data, 'Failed to fetch user');
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to fetch user'));
@@ -64,7 +64,7 @@ export const userService = {
 
   updateUser: async (userId: string, payload: UpdateUserPayload): Promise<UserData> => {
     try {
-      const { data } = await axiosApi.put<ApiResponse<UserData>>(`/user/${userId}`, payload);
+      const { data } = await axiosApi.put<ApiResponse<UserData>>(`/api/user/${userId}`, payload);
       return requireData(data, 'Failed to update user');
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to update user'));
@@ -73,7 +73,7 @@ export const userService = {
 
   deleteUser: async (userId: string): Promise<void> => {
     try {
-      await axiosApi.delete(`/user/${userId}`);
+      await axiosApi.delete(`/api/user/${userId}`);
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to delete user'));
     }
@@ -92,7 +92,7 @@ export const userService = {
 
   updateProfile: async (userId: string, payload: Record<string, unknown>) => {
     try {
-      const { data } = await axiosApi.put<ApiResponse<unknown>>(`/profile/${userId}`, payload);
+      const { data } = await axiosApi.put<ApiResponse<unknown>>(`/api/profile/${userId}`, payload);
       return requireData(data, 'Failed to update profile');
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to update profile'));
@@ -107,7 +107,7 @@ export const userService = {
     photoURL: string | null;
   }> => {
     try {
-      const { data } = await axiosApi.get('/user/profile');
+      const { data } = await axiosApi.get('/api/user/profile');
       return data;
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to fetch profile'));
@@ -120,7 +120,7 @@ export const userService = {
     phone_number?: string;
   }): Promise<void> => {
     try {
-      await axiosApi.put('/user/profile', payload);
+      await axiosApi.put('/api/user/profile', payload);
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to update profile'));
     }

@@ -58,7 +58,7 @@ export const organizationService = {
   listAll: async (): Promise<OrgBrief[]> => {
     try {
       const { data } = await axiosApi.get<ApiResponse<{ organizations: OrgBrief[] }>>(
-        '/organizations/admin',
+        '/api/organizations/admin',
       );
       return data.data?.organizations ?? [];
     } catch (error) {
@@ -69,7 +69,7 @@ export const organizationService = {
   create: async (payload: CreateOrgPayload): Promise<OrgBrief> => {
     try {
       const { data } = await axiosApi.post<ApiResponse<{ organization: OrgBrief & Record<string, unknown> }>>(
-        '/organizations',
+        '/api/organizations',
         payload,
       );
       const org = data.data?.organization;
@@ -83,7 +83,7 @@ export const organizationService = {
   getMembers: async (orgId: string): Promise<OrgMember[]> => {
     try {
       const { data } = await axiosApi.get<ApiResponse<{ members: OrgMember[] }>>(
-        `/organizations/${orgId}/members`,
+        `/api/organizations/${orgId}/members`,
       );
       return data.data?.members ?? [];
     } catch (error) {
@@ -93,7 +93,7 @@ export const organizationService = {
 
   updateMemberRole: async (orgId: string, uid: string, role: 'orgAdmin' | 'member'): Promise<void> => {
     try {
-      await axiosApi.patch(`/organizations/${orgId}/members/${uid}/role`, { role });
+      await axiosApi.patch(`/api/organizations/${orgId}/members/${uid}/role`, { role });
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to update role'));
     }
@@ -101,7 +101,7 @@ export const organizationService = {
 
   removeMember: async (orgId: string, uid: string): Promise<void> => {
     try {
-      await axiosApi.delete(`/organizations/${orgId}/members/${uid}`);
+      await axiosApi.delete(`/api/organizations/${orgId}/members/${uid}`);
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to remove member'));
     }
@@ -109,7 +109,7 @@ export const organizationService = {
 
   inviteMembers: async (orgId: string, invites: InvitePayload[]): Promise<void> => {
     try {
-      await axiosApi.post(`/organizations/${orgId}/members/invite`, { invites });
+      await axiosApi.post(`/api/organizations/${orgId}/members/invite`, { invites });
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to send invite'));
     }

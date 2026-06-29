@@ -3,15 +3,15 @@ import { CONFIG } from '@/config';
 import { getAuthCookie, setAuthCookie, auth } from '@/lib/firebase';
 
 export const axiosApi = axios.create({
-  baseURL: CONFIG.API_URL + '/api',
+  baseURL: CONFIG.API_URL,
   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-   withCredentials: true
+  withCredentials: true,
 });
 
 export const publicAxios = axios.create({
-  baseURL: CONFIG.API_URL + '/api',
+  baseURL: CONFIG.API_URL,
   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-   withCredentials: true
+  withCredentials: true,
 });
 
 // Attach Bearer token from cookie on every request

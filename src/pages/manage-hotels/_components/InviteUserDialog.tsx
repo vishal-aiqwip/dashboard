@@ -106,7 +106,7 @@ export function InviteUserDialog({
 
   const inviteMutation = useMutation({
     mutationFn: async (data: FormSchema) => {
-      const { data: res } = await axiosApi.post('/organizations/invite', { invites: data.invites });
+      const { data: res } = await axiosApi.post('/invite-users', { invites: data.invites });
       return res;
     },
     onSuccess: (res) => {
