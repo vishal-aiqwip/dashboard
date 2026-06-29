@@ -1,18 +1,11 @@
 import { useMemo, useState, useCallback } from 'react';
-import {
-  type ColumnDef,
-  type SortingState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
+import { type ColumnDef } from '@tanstack/react-table';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  CheckCircle2, AlertTriangle, Circle, Search,
+  CheckCircle2, AlertTriangle, Circle,
   Plug, Mail, Bot, CalendarCheck, Star, Users, Inbox,
+  Loader,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -21,51 +14,21 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { axiosApi } from '@/lib/axios';
+import { DataTable } from '@/components/data-table/data-table';
+import { betaFeaturesService } from '@/services/betaFeatures/betaFeatures';
+import { emailInboxRoutingService } from '@/services/emailInboxRouting/emailInboxRouting';
+import type { BetaFeature } from '@/services/betaFeatures/betaFeatures';
+import type { HotelEmailRouting, ReadinessReport } from '@/services/emailInboxRouting/emailInboxRouting';
 import { organizationService, type OrgBrief } from '@/services/organizations/organizations';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type BetaFeature = {
-  id: string;
-  name: string;
-  organizations: string[];
-};
-
-type HotelEmailRouting = {
-  organization_id: string;
-  organization_name: string | null;
-  processing_version: 'v1' | 'v2';
-  has_email_settings: boolean;
-};
-
-type ReadinessReport = {
-  organization_id: string;
-  ready: boolean;
-  unavailable?: boolean;
-  checks?: {
-    email_settings: { ok: boolean; detail?: string };
-    knowledge_base: { ok: boolean; namespace?: string | null; detail?: string };
-    pms_tools: { ok: boolean; systems?: string[]; detail?: string };
-    taxonomy: { status: 'ready' | 'generating' | 'empty' | 'error'; count: number; detail?: string };
-  };
-};
 
 type ReadinessVisual =
   | 'safe' | 'warn' | 'generating' | 'ready' | 'attention' | 'unavailable' | 'unknown';
@@ -100,7 +63,6 @@ function deriveReadinessVisual({ isV2, readiness }: { isV2: boolean; readiness?:
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
 
 function ReadinessIcon({ isV2, readiness }: { isV2: boolean; readiness?: ReadinessReport }) {
   const visual = deriveReadinessVisual({ isV2, readiness });
@@ -159,7 +121,6 @@ function ReadinessIcon({ isV2, readiness }: { isV2: boolean; readiness?: Readine
   );
 }
 
-// EmailInboxCell is a component so it can call useQuery
 function EmailInboxCell({
   orgId,
   hotel,
@@ -173,12 +134,7 @@ function EmailInboxCell({
 }) {
   const { data: readiness } = useQuery<ReadinessReport>({
     queryKey: ['email-inbox-readiness', orgId],
-    queryFn: async () => {
-      const { data } = await axiosApi.get(
-        `/api/email-inbox-routing/readiness?organization_id=${encodeURIComponent(orgId)}`,
-      );
-      return data.data as ReadinessReport;
-    },
+    queryFn: () => emailInboxRoutingService.getReadiness(orgId),
     enabled: !!hotel,
     staleTime: 30_000,
   });
@@ -207,17 +163,12 @@ export default function BetaFeaturesPage() {
   const qc = useQueryClient();
   const [featurePending, setFeaturePending] = useState<Set<string>>(new Set());
   const [pendingOrgIds, setPendingOrgIds] = useState<Set<string>>(new Set());
-  const [rowSelection, setRowSelection] = useState({});
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
   // ── Queries ──
   const { data: features = [], isLoading, error } = useQuery<BetaFeature[]>({
     queryKey: ['beta-features'],
-    queryFn: async () => {
-      const { data } = await axiosApi.get('/api/beta-features');
-      return (data?.data?.features ?? []) as BetaFeature[];
-    },
+    queryFn: betaFeaturesService.list,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -229,27 +180,19 @@ export default function BetaFeaturesPage() {
 
   const { data: hotels = [] } = useQuery<HotelEmailRouting[]>({
     queryKey: ['email-inbox-routing'],
-    queryFn: async () => {
-      const { data } = await axiosApi.get('/api/email-inbox-routing');
-      return (data?.data?.hotels ?? []) as HotelEmailRouting[];
-    },
+    queryFn: emailInboxRoutingService.list,
     staleTime: 60_000,
   });
 
   // ── Mutations ──
   const featureMutation = useMutation({
-    mutationFn: async (p: { featureName: string; organizationId: string; enabled: boolean }) => {
-      const { data } = await axiosApi.post('/api/beta-features/access', p);
-      return data;
-    },
+    mutationFn: betaFeaturesService.setAccess,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['beta-features'] }),
   });
 
   const emailMutation = useMutation({
-    mutationFn: async (p: { organization_id: string; enabled: boolean }) => {
-      const { data } = await axiosApi.post('/api/email-inbox-routing', p);
-      return data;
-    },
+    mutationFn: ({ organization_id, enabled }: { organization_id: string; enabled: boolean }) =>
+      emailInboxRoutingService.setVersion(organization_id, enabled),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: ['email-inbox-routing'] });
       qc.invalidateQueries({ queryKey: ['email-inbox-readiness', v?.organization_id] });
@@ -312,6 +255,13 @@ export default function BetaFeaturesPage() {
     [organizations, features, hotels],
   );
 
+  // ── Selected rows derived from external rowSelection state ──
+  const selectedRows = useMemo(
+    () => tableData.filter((row) => rowSelection[row.org.id] === true),
+    [tableData, rowSelection],
+  );
+  const someSelected = selectedRows.length > 0;
+
   // ── Column defs ──
   const columns = useMemo<ColumnDef<OrgTableRow>[]>(
     () => [
@@ -338,7 +288,7 @@ export default function BetaFeaturesPage() {
         id: 'organization',
         accessorFn: (r) => r.org.name,
         header: 'Organization',
-        size: 200,
+        size: 320,
         cell: ({ row }) => (
           <span className="font-medium">{row.original.org.name}</span>
         ),
@@ -382,48 +332,31 @@ export default function BetaFeaturesPage() {
     [features, featurePending, pendingOrgIds, handleFeatureToggle, handleEmailToggle],
   );
 
-  // ── TanStack Table ──
-  const table = useReactTable({
-    data: tableData,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
-    state: { rowSelection, sorting, globalFilter },
-  });
-
-  const selectedRows = table.getFilteredSelectedRowModel().rows;
-  const someSelected = selectedRows.length > 0;
-
+  // ── Bulk action handlers ──
   const handleBulkEmailEnable = () => {
     selectedRows.forEach((row) => {
-      const hotel = row.original.hotel;
-      if (hotel && hotel.processing_version !== 'v2') handleEmailToggle(hotel, true);
+      if (row.hotel && row.hotel.processing_version !== 'v2') handleEmailToggle(row.hotel, true);
     });
   };
 
   const handleBulkEmailDisable = () => {
     selectedRows.forEach((row) => {
-      const hotel = row.original.hotel;
-      if (hotel && hotel.processing_version !== 'v1') handleEmailToggle(hotel, false);
+      if (row.hotel && row.hotel.processing_version !== 'v1') handleEmailToggle(row.hotel, false);
     });
   };
 
   const handleBulkEnableFeature = (featureName: string) => {
     selectedRows.forEach((row) => {
-      if (!row.original.featureAccess[featureName]) {
-        handleFeatureToggle(featureName, row.original.org.id, true);
+      if (!row.featureAccess[featureName]) {
+        handleFeatureToggle(featureName, row.org.id, true);
       }
     });
   };
 
   const handleBulkDisableFeature = (featureName: string) => {
     selectedRows.forEach((row) => {
-      if (row.original.featureAccess[featureName]) {
-        handleFeatureToggle(featureName, row.original.org.id, false);
+      if (row.featureAccess[featureName]) {
+        handleFeatureToggle(featureName, row.org.id, false);
       }
     });
   };
@@ -431,16 +364,7 @@ export default function BetaFeaturesPage() {
   // ── Derived stats ──
   const v2Count = hotels.filter((h) => h.processing_version === 'v2').length;
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <h2 className="text-2xl font-semibold">Beta Features</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-20" />)}
-        </div>
-      </div>
-    );
-  }
+
 
   if (error) {
     return (
@@ -458,175 +382,152 @@ export default function BetaFeaturesPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
-
         <h2 className="text-2xl font-semibold">Beta Features</h2>
         <p className="text-sm text-muted-foreground">
-          This page allows you to manage access to beta features for organizations. You can toggle access for individual features or enable/disable all features for selected organizations. Additionally, you can manage the email inbox routing version (v1 or v2) for hotels.
+          Manage access to beta features for organizations. Toggle individual features or bulk-enable/disable for selected organizations. Also manage email inbox routing version (v1 or v2) for hotels.
         </p>
       </div>
 
-      {/* Per-feature stat cards */}
-      <div className="grid gap-4 grid-cols-3">
-        {features.map((f) => {
-          const Icon = getFeatureIcon(f.name);
-          const count = f.organizations.length;
-          const total = organizations.length;
-          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-          return (
-            <Card key={f.name}>
+      {isLoading ? (
+        <div className="flex items-center gap-2  text-sm text-muted-foreground">
+          <Loader className="h-4 w-4 animate-spin" />
+          Loading beta features…
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {/* Per-feature stat cards */}
+          <div className="grid gap-4 grid-cols-3">
+            {features.map((f) => {
+              const Icon = getFeatureIcon(f.name);
+              const count = f.organizations.length;
+              const total = organizations.length;
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+              return (
+                <Card key={f.name}>
+                  <CardContent className="p-0 px-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                        <Icon className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-medium capitalize truncate">{f.name}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge variant={count > 0 ? 'default' : 'secondary'} className="text-xs">
+                        {count}/{total} organizations
+                      </Badge>
+                      {pct > 0 && <span className="text-xs text-muted-foreground">{pct}%</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            <Card>
               <CardContent className="p-0 px-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-                    <Icon className="h-5 w-5 text-blue-600" />
+                    <Inbox className="h-5 w-5 text-blue-600" />
                   </div>
-                  <span className="text-sm font-medium capitalize truncate">{f.name}</span>
+                  <span className="text-sm font-medium">Email Inbox</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <Badge variant={count > 0 ? 'default' : 'secondary'} className="text-xs">
-                    {count}/{total} organizations
+                  <Badge variant={v2Count > 0 ? 'default' : 'secondary'} className="text-xs">
+                    {v2Count}/{hotels.length} on v2
                   </Badge>
-                  {pct > 0 && <span className="text-xs text-muted-foreground">{pct}%</span>}
+                  {hotels.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {Math.round((v2Count / hotels.length) * 100)}%
+                    </span>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
-        <Card>
-          <CardContent className="p-0 px-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-                <Inbox className="h-5 w-5 text-blue-600" />
-              </div>
-              <span className="text-sm font-medium">Email Inbox</span>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Badge variant={v2Count > 0 ? 'default' : 'secondary'} className="text-xs">
-                {v2Count}/{hotels.length} on v2
-              </Badge>
-              {hotels.length > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {Math.round((v2Count / hotels.length) * 100)}%
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      <Card>
-        <CardContent className="">
-
-          {/* Toolbar */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Filter organizations..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-8"
+          <Card>
+            <CardContent>
+              <DataTable
+                columns={columns}
+                data={tableData}
+                filterPlaceholder="Filter organizations..."
+                emptyMessage="No organizations found."
+                enableGlobalFilter={true}
+                enablePagination={false}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                getRowId={(row) => row.org.id}
+                enableRowSelection={true}
               />
-            </div>
+            </CardContent>
+          </Card>
+        </div>
 
-          </div>
+      )
+      }
 
-          {/* Data table */}
-          <div className="overflow-x-auto rounded-md border mt-3">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((hg) => (
-                  <TableRow key={hg.id}>
-                    {hg.headers.map((header) => (
-                      <TableHead key={header.id} style={{ width: header.getSize() }}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id} data-state={row.getIsSelected() ? 'selected' : undefined}>
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                      No organizations found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+
+
+
+
 
       {/* Floating bulk-action bar */}
-      {someSelected && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center gap-4 border-t bg-white px-6 py-3 shadow-xl">
-          <Badge className="shrink-0 text-sm">{selectedRows.length} selected</Badge>
-          <div className="flex flex-1 items-center gap-x-3 overflow-x-auto">
-            {features.map((f, i) => (
-              <>
-                {i > 0 && <div key={`sep-${f.name}`} className="h-5 w-px shrink-0 bg-border" />}
-                <div key={f.name} className="flex shrink-0 items-center gap-1.5">
-                  <span className="text-xs font-medium capitalize text-muted-foreground">{f.name}</span>
-                  <Button
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => handleBulkEnableFeature(f.name)}
-                    disabled={featureMutation.isPending}
-                  >
-                    Enable
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => handleBulkDisableFeature(f.name)}
-                    disabled={featureMutation.isPending}
-                  >
-                    Disable
-                  </Button>
-                </div>
-              </>
-            ))}
-            <div className="h-5 w-px shrink-0 bg-border" />
-            <div className="flex shrink-0 items-center gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Email Inbox</span>
-              <Button
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={handleBulkEmailEnable}
-                disabled={emailMutation.isPending}
-              >
-                v2
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 text-xs"
-                onClick={handleBulkEmailDisable}
-                disabled={emailMutation.isPending}
-              >
-                v1
-              </Button>
+      {
+        someSelected && (
+          <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center gap-4 border-t bg-white px-6 py-3 shadow-xl">
+            <Badge className="shrink-0 text-sm">{selectedRows.length} selected</Badge>
+            <div className="flex flex-1 items-center gap-x-3 overflow-x-auto">
+              {features.map((f, i) => (
+                <>
+                  {i > 0 && <div key={`sep-${f.name}`} className="h-5 w-px shrink-0 bg-border" />}
+                  <div key={f.name} className="flex shrink-0 items-center gap-1.5">
+                    <span className="text-xs font-medium capitalize text-muted-foreground">{f.name}</span>
+                    <Button
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handleBulkEnableFeature(f.name)}
+                      disabled={featureMutation.isPending}
+                    >
+                      Enable
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handleBulkDisableFeature(f.name)}
+                      disabled={featureMutation.isPending}
+                    >
+                      Disable
+                    </Button>
+                  </div>
+                </>
+              ))}
+              <div className="h-5 w-px shrink-0 bg-border" />
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Email Inbox</span>
+                <Button
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={handleBulkEmailEnable}
+                  disabled={emailMutation.isPending}
+                >
+                  v2
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  onClick={handleBulkEmailDisable}
+                  disabled={emailMutation.isPending}
+                >
+                  v1
+                </Button>
+              </div>
             </div>
+            <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setRowSelection({})}>
+              Clear
+            </Button>
           </div>
-          <Button size="sm" variant="ghost" className="shrink-0" onClick={() => table.resetRowSelection()}>
-            Clear
-          </Button>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

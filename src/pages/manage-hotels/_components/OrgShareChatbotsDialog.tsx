@@ -9,9 +9,8 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { axiosApi } from '@/lib/axios';
-
-type Chatbot = { id: string; chatbot_name: string };
+import { chatbotsService } from '@/services/chatbots/chatbots';
+import type { Chatbot } from '@/services/chatbots/chatbots';
 
 interface Props {
   open: boolean;
@@ -26,10 +25,7 @@ export function OrgShareChatbotsDialog({ open, onOpenChange, organizationId, org
 
   const { data: chatbots = [], isLoading, isError } = useQuery<Chatbot[]>({
     queryKey: ['chatbots', organizationId],
-    queryFn: async () => {
-      const { data } = await axiosApi.get('/api/chatbots', { params: { organization_id: organizationId } });
-      return data?.data?.chatbots ?? [];
-    },
+    queryFn: () => chatbotsService.listByOrg(organizationId),
     enabled: open && !!organizationId,
     staleTime: 0,
   });
@@ -121,7 +117,7 @@ export function OrgShareChatbotsDialog({ open, onOpenChange, organizationId, org
                 <Input readOnly value={shareContent} className="font-mono text-xs" />
               ) : (
                 <div className="rounded-md border bg-muted/40 max-h-48 overflow-auto ">
-                  <pre className="p-3 text-xs max-w-[500px] ">{shareContent}</pre>
+                  <pre className="p-3 text-xs max-w-125">{shareContent}</pre>
                 </div>
               )}
             </div>

@@ -9,9 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { axiosApi } from '@/lib/axios';
-
-type Chatbot = { id: string; custom_tool_prompt?: string | null };
+import { chatbotsService } from '@/services/chatbots/chatbots';
+import type { Chatbot } from '@/services/chatbots/chatbots';
 
 interface Props {
   open: boolean;
@@ -25,10 +24,7 @@ export function OrgCustomToolPromptDialog({ open, onOpenChange, organizationId }
 
   const { data: chatbots = [], isLoading, isError } = useQuery<Chatbot[]>({
     queryKey: ['chatbots', organizationId, 'with-tool-prompts'],
-    queryFn: async () => {
-      const { data } = await axiosApi.get('/api/chatbots', { params: { organization_id: organizationId } });
-      return data?.data?.chatbots ?? [];
-    },
+    queryFn: () => chatbotsService.listByOrg(organizationId),
     enabled: open && !!organizationId,
     staleTime: 0,
   });
@@ -47,12 +43,11 @@ export function OrgCustomToolPromptDialog({ open, onOpenChange, organizationId }
   const onSave = async () => {
     setIsSaving(true);
     try {
-      const { data } = await axiosApi.get('/api/chatbots', { params: { organization_id: organizationId } });
-      const bots: Chatbot[] = data?.data?.chatbots ?? [];
+      const bots = await chatbotsService.listByOrg(organizationId);
       let updated = 0;
       for (const bot of bots) {
         try {
-          await axiosApi.patch(`/api/chatbots/${bot.id}`, { custom_tool_prompt: prompt }, { params: { organization_id: organizationId } });
+          await chatbotsService.update(bot.id, { custom_tool_prompt: prompt });
           updated += 1;
         } catch { /* continue */ }
       }

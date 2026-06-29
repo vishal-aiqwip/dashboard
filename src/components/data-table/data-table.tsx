@@ -4,6 +4,8 @@ import {
   type ColumnDef,
   type SortingState,
   type VisibilityState,
+  type RowSelectionState,
+  type OnChangeFn,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -39,6 +41,12 @@ interface DataTableProps<TData, TValue> {
   emptyMessage?: string;
   enableGlobalFilter?: boolean;
   enableColumnVisibilityToggle?: boolean;
+  enablePagination?: boolean;
+  // External row selection control (opt-in)
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+  getRowId?: (row: TData, index: number) => string;
+  enableRowSelection?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -47,30 +55,36 @@ export function DataTable<TData, TValue>({
   filterPlaceholder = 'Filter...',
   emptyMessage = 'No results.',
   enableGlobalFilter = true,
-  enableColumnVisibilityToggle = false
+  enableColumnVisibilityToggle = false,
+  enablePagination = true,
+  rowSelection: externalRowSelection,
+  onRowSelectionChange,
+  getRowId,
+  enableRowSelection = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
+  const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({});
 
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    ...(enablePagination ? { getPaginationRowModel: getPaginationRowModel() } : {}),
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: setColumnVisibility,
     getFilteredRowModel: getFilteredRowModel(),
-    onRowSelectionChange: setRowSelection,
-
+    onRowSelectionChange: onRowSelectionChange ?? setInternalRowSelection,
+    ...(getRowId ? { getRowId } : {}),
+    enableRowSelection,
     state: {
       sorting,
       globalFilter,
       columnVisibility,
-      rowSelection
+      rowSelection: externalRowSelection ?? internalRowSelection,
     }
   });
 
@@ -113,7 +127,7 @@ export function DataTable<TData, TValue>({
           </DropdownMenu>
         )}
       </div>
-      <div className="overflow-hidden rounded-md border">
+      <div className="overflow-x-auto rounded-md border">
         <Table className="table-fixed">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -154,10 +168,11 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      <div className="mt-3">
-
-        <DataTablePagination table={table} />
-      </div>
+      {enablePagination && (
+        <div className="mt-3">
+          <DataTablePagination table={table} />
+        </div>
+      )}
 
     </>
   );

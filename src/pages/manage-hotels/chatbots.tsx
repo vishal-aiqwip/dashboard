@@ -13,28 +13,14 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { axiosApi } from '@/lib/axios';
+import { chatbotsService } from '@/services/chatbots/chatbots';
+import type { AiProvider, GlobalChatbotSettings, OrgPublishedStatus } from '@/services/chatbots/chatbots';
 
 import { OrgAutoRetrainDialog } from './_components/OrgAutoRetrainDialog';
 import { OrgShareChatbotsDialog } from './_components/OrgShareChatbotsDialog';
 import { OrgCustomToolPromptDialog } from './_components/OrgCustomToolPromptDialog';
 import { OrgSystemPromptDialog } from './_components/OrgSystemPromptDialog';
 import { OrgIndexResetDialog } from './_components/OrgIndexResetDialog';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type AiProvider = 'openai' | 'azure';
-
-type GlobalChatbotSettings = {
-  llm_provider: AiProvider;
-  visible: boolean;
-};
-
-type OrgPublishedStatus = {
-  organization_id: string;
-  organization_name: string;
-  published: boolean;
-};
 
 // ─── ProviderOption ───────────────────────────────────────────────────────────
 
@@ -109,11 +95,7 @@ export default function ChatbotsPage() {
 
   const { data: globalSettings, refetch: refetchGlobal } = useQuery<GlobalChatbotSettings>({
     queryKey: ['globalChatbotSettings'],
-    queryFn: async () => {
-      const { data } = await axiosApi.get('/api/get-global-chatbot-settings');
-      const d = data?.data ?? {};
-      return { llm_provider: (d.llm_provider ?? 'azure') as AiProvider, visible: d.visible ?? true };
-    },
+    queryFn: chatbotsService.getGlobalSettings,
     staleTime: 0,
   });
 
@@ -123,34 +105,25 @@ export default function ChatbotsPage() {
     error: orgPublishedError,
   } = useQuery<OrgPublishedStatus[]>({
     queryKey: ['orgsChatbotsPublishedStatus'],
-    queryFn: async () => {
-      const { data } = await axiosApi.get('/api/organizations/chatbots/published-status');
-      return (data?.data?.organizations ?? []) as OrgPublishedStatus[];
-    },
+    queryFn: chatbotsService.listOrgPublishedStatus,
     staleTime: 0,
   });
 
   // ── Mutations ──
 
   const { mutateAsync: updateProvider, isPending: isProviderPending } = useMutation({
-    mutationFn: async (p: AiProvider) => {
-      await axiosApi.post('/api/update-chatbot-ai-model', { provider: p });
-    },
+    mutationFn: chatbotsService.updateProvider,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['globalChatbotSettings'] }),
   });
 
   const { mutateAsync: updateVisibility, isPending: isVisibilityPending } = useMutation({
-    mutationFn: async (v: boolean) => {
-      await axiosApi.post('/api/update-global-chatbots-visibility', { visible: v });
-    },
+    mutationFn: chatbotsService.updateVisibility,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['globalChatbotSettings'] }),
   });
 
   const { mutateAsync: setOrgPublishedMutation, isPending: isSetOrgPublishedPending } = useMutation({
-    mutationFn: async (payload: { organization_id: string; published: boolean }) => {
-      const { data } = await axiosApi.post('/api/organizations/chatbots/set-published-status', payload);
-      return data?.data;
-    },
+    mutationFn: async (payload: { organization_id: string; published: boolean }) =>
+      chatbotsService.setOrgPublishedStatus(payload.organization_id, payload.published),
     onMutate: async ({ organization_id, published }) => {
       await qc.cancelQueries({ queryKey: ['orgsChatbotsPublishedStatus'] });
       const previous = qc.getQueryData<OrgPublishedStatus[]>(['orgsChatbotsPublishedStatus']);
