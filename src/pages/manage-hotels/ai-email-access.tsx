@@ -342,7 +342,7 @@ export default function AiEmailAccessPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Requested by</TableHead>
-                      <TableHead>Tenant</TableHead>
+                      <TableHead className="w-72">Tenant</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Pending Requests</TableHead>
                       <TableHead>Activated</TableHead>
@@ -371,7 +371,7 @@ export default function AiEmailAccessPage() {
                           <TableCell className="max-w-50 wrap-break-word py-3 text-sm">
                             {t.requested_by_email ?? '—'}
                           </TableCell>
-                          <TableCell className="max-w-50 wrap-break-word py-3 font-mono text-xs text-muted-foreground">
+                          <TableCell className="w-72 max-w-72 wrap-break-word py-3 font-mono text-xs text-muted-foreground">
                             {t.key}
                           </TableCell>
                           <TableCell className="py-3">
