@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
-import { IconBuildingSkyscraper, IconCheck, IconChevronDown } from '@tabler/icons-react';
+import { useQuery } from '@tanstack/react-query';
+import { IconBuildingSkyscraper, IconCheck, IconChevronDown, IconLoader2 } from '@tabler/icons-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +13,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { HOTELS } from '@/config/sidebar-nav';
+import { organizationService } from '@/services/organizations/organizations';
 import { cn } from '@/lib/utils';
 
 const ALL_HOTELS = 'all';
@@ -24,10 +25,17 @@ type HotelFilterProps = {
 
 export function HotelFilter({ value, onChange }: HotelFilterProps) {
   const [open, setOpen] = useState(false);
-  const selected =
+
+  const { data: orgs = [], isLoading } = useQuery({
+    queryKey: ['organizations'],
+    queryFn: () => organizationService.listAll(),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const selectedName =
     value === ALL_HOTELS
-      ? { id: ALL_HOTELS, name: 'All hotels' }
-      : HOTELS.find((h) => h.id === value) ?? { id: ALL_HOTELS, name: 'All hotels' };
+      ? 'All hotels'
+      : (orgs.find((o) => o.id === value)?.name ?? 'All hotels');
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -36,8 +44,13 @@ export function HotelFilter({ value, onChange }: HotelFilterProps) {
           variant="outline"
           size="sm"
           className="h-9 min-w-[160px] justify-between gap-2 font-normal"
+          disabled={isLoading}
         >
-          <span className="truncate">{selected.name}</span>
+          {isLoading ? (
+            <IconLoader2 className="size-4 animate-spin opacity-60" />
+          ) : (
+            <span className="truncate">{selectedName}</span>
+          )}
           <IconChevronDown className="size-4 opacity-60" />
         </Button>
       </PopoverTrigger>
@@ -58,25 +71,25 @@ export function HotelFilter({ value, onChange }: HotelFilterProps) {
                 <IconBuildingSkyscraper className="size-4 opacity-70" />
                 <span className="flex-1 truncate font-medium">All hotels</span>
                 <IconCheck
-                  className={cn('size-4', selected.id === ALL_HOTELS ? 'opacity-100' : 'opacity-0')}
+                  className={cn('size-4', value === ALL_HOTELS ? 'opacity-100' : 'opacity-0')}
                 />
               </CommandItem>
             </CommandGroup>
             <CommandGroup heading="Hotels">
-              {HOTELS.map((hotel) => (
+              {orgs.map((org) => (
                 <CommandItem
-                  key={hotel.id}
-                  value={hotel.name}
+                  key={org.id}
+                  value={org.name}
                   onSelect={() => {
-                    onChange(hotel.id);
+                    onChange(org.id);
                     setOpen(false);
                   }}
                   className="data-selected:bg-accent data-selected:text-accent-foreground"
                 >
                   <IconBuildingSkyscraper className="size-4 opacity-70" />
-                  <span className="flex-1 truncate">{hotel.name}</span>
+                  <span className="flex-1 truncate">{org.name}</span>
                   <IconCheck
-                    className={cn('size-4', selected.id === hotel.id ? 'opacity-100' : 'opacity-0')}
+                    className={cn('size-4', value === org.id ? 'opacity-100' : 'opacity-0')}
                   />
                 </CommandItem>
               ))}
