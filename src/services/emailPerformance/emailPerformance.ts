@@ -331,4 +331,46 @@ export const emailPerformanceService = {
       throw new Error(getApiErrorMessage(error, 'Failed to fetch tool calls'));
     }
   },
+
+  // Returns raw JSON text (not wrapped) — caller parses it
+  getEmailsExport: async (params: Record<string, unknown>): Promise<string> => {
+    try {
+      const { data } = await axiosApi.get<string>('/email-assistant-stats/emails/export', {
+        params: { ...params, format: 'json' },
+        responseType: 'text',
+      });
+      return data;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to export emails'));
+    }
+  },
+
+  getBulkToolCalls: async (
+    interactionIds: string[],
+  ): Promise<{ tool_calls_by_interaction: Record<string, EAToolCallRow[]> }> => {
+    try {
+      const { data } = await axiosApi.post<unknown>(
+        '/email-assistant-stats/emails/bulk-tool-calls',
+        interactionIds,
+      );
+      return unwrap<{ tool_calls_by_interaction: Record<string, EAToolCallRow[]> }>(data);
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to fetch bulk tool calls'));
+    }
+  },
+
+  getBulkThreads: async (
+    orgId: string,
+    items: { mailbox: string; conversation_id: string }[],
+  ): Promise<Record<string, unknown[]>> => {
+    try {
+      const { data } = await axiosApi.post<unknown>('/email-training-center/bulk-threads', {
+        org_id: orgId,
+        items,
+      });
+      return (data as Record<string, unknown[]>) ?? {};
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to fetch bulk threads'));
+    }
+  },
 };

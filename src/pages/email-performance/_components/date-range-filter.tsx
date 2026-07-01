@@ -93,6 +93,8 @@ export function DateRangeFilter({ value, onChange, granularity = 'day' }: DateRa
     setDraft(DEFAULT_SELECTION);
     setRange(undefined);
     setTab('presets');
+    onChange(DEFAULT_SELECTION);
+    setOpen(false);
   };
 
   const canApply =

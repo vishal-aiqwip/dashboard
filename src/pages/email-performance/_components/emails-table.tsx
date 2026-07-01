@@ -7,7 +7,6 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconDownload,
   IconEye,
   IconFilter,
   IconLoader2,
@@ -30,6 +29,7 @@ import {
 import { transformEmails } from '@/pages/email-performance/_data/transform';
 import type { EmailRow } from '@/pages/email-performance/_data/mock';
 import { emailPerformanceService } from '@/services/emailPerformance/emailPerformance';
+import { EmailExportButton } from './email-export-button';
 
 type SortKey = 'sentAt' | 'editDist' | 'jaccard' | 'semantic' | 'verdict' | 'failure';
 type SortDir = 'asc' | 'desc';
@@ -172,10 +172,7 @@ export function EmailsTable({ baseParams, categories = [], mailboxes = [] }: Pro
               Clear
             </Button>
           )}
-          <Button variant="outline" size="sm">
-            <IconDownload className="size-4" />
-            Export
-          </Button>
+          <EmailExportButton baseParams={baseParams} filters={filters} />
         </div>
       </div>
 
