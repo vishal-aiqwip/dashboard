@@ -12,11 +12,13 @@ const EmailPerformancePage = lazy(() => import('@/pages/email-performance'));
 const ProfilePage = lazy(() => import('@/pages/Profile'));
 
 const ManageHotelsPage = lazy(() => import('@/pages/manage-hotels'));
+const ManageUsersPage = lazy(() => import('@/pages/manage-users'));
 const HotelUsersPage = lazy(() => import('@/pages/manage-hotels/hotel-users'));
 const AiEmailAccessPage = lazy(() => import('@/pages/manage-hotels/ai-email-access'));
 const BetaFeaturesPage = lazy(() => import('@/pages/manage-hotels/beta-features'));
 const ChatbotsPage = lazy(() => import('@/pages/manage-hotels/chatbots'));
 const SecurityPage = lazy(() => import('@/pages/manage-hotels/security'));
+const ChatbotTestPage = lazy(() => import('@/pages/chatbot-test'));
 
 function LazyPage({ children }: { children: React.ReactNode }) {
   return (
@@ -123,6 +125,22 @@ const router = createBrowserRouter([
             element: (
               <LazyPage>
                 <SecurityPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'manage-users',
+            element: (
+              <LazyPage>
+                <ManageUsersPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'chatbot-test',
+            element: (
+              <LazyPage>
+                <ChatbotTestPage />
               </LazyPage>
             ),
           },
