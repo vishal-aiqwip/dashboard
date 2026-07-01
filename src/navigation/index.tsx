@@ -19,6 +19,7 @@ const BetaFeaturesPage = lazy(() => import('@/pages/manage-hotels/beta-features'
 const ChatbotsPage = lazy(() => import('@/pages/manage-hotels/chatbots'));
 const SecurityPage = lazy(() => import('@/pages/manage-hotels/security'));
 const ChatbotTestPage = lazy(() => import('@/pages/chatbot-test'));
+const EmailTrainingCenterPage = lazy(() => import('@/pages/email-training-center'));
 
 function LazyPage({ children }: { children: React.ReactNode }) {
   return (
@@ -141,6 +142,14 @@ const router = createBrowserRouter([
             element: (
               <LazyPage>
                 <ChatbotTestPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'email-training-center',
+            element: (
+              <LazyPage>
+                <EmailTrainingCenterPage />
               </LazyPage>
             ),
           },

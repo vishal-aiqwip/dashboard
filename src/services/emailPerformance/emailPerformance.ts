@@ -110,6 +110,7 @@ export type EAEmailRow = {
   specific_fix: string | null;
   fact_status: string | null;
   could_be_fixed_without_new_systems: string | null;
+  conversation_id?: string | null;
   // only present when include_body=true
   ai_draft_preview?: string | null;
   final_sent_preview?: string | null;

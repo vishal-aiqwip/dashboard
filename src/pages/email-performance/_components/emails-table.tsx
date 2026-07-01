@@ -1,22 +1,29 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
 import {
-  IconArrowsSort,
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
-  IconEye,
-  IconFilter,
-  IconLoader2,
-  IconSortAscending,
-  IconSortDescending,
-  IconX,
-} from '@tabler/icons-react';
+  type ColumnDef,
+  type PaginationState,
+  type SortingState,
+  type VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import { IconEye, IconFilter, IconLoader2, IconX } from '@tabler/icons-react';
 
+import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
+import { DataTablePagination } from '@/components/data-table/data-table-pagination';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { EditClassBadge } from '@/pages/email-performance/_components/edit-class-badge';
 import { EmailDetailSheet } from '@/pages/email-performance/_components/email-detail-sheet';
@@ -31,13 +38,10 @@ import type { EmailRow } from '@/pages/email-performance/_data/mock';
 import { emailPerformanceService } from '@/services/emailPerformance/emailPerformance';
 import { EmailExportButton } from './email-export-button';
 
-type SortKey = 'sentAt' | 'editDist' | 'jaccard' | 'semantic' | 'verdict' | 'failure';
-type SortDir = 'asc' | 'desc';
-
-const PAGE_SIZE = 15;
 const STALE = 5 * 60 * 1000;
 
-const SORT_KEY_MAP: Record<SortKey, string> = {
+// Maps TanStack column id → backend sort field name
+const SORT_KEY_MAP: Record<string, string> = {
   sentAt: 'sent_at',
   editDist: 'edit_distance_ratio',
   jaccard: 'jaccard_distance',
@@ -49,9 +53,7 @@ const SORT_KEY_MAP: Record<SortKey, string> = {
 function formatShortDateTime(iso: string) {
   const d = new Date(iso);
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(
-    d.getMinutes()
-  )}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 type BaseParams = { from_date: string; to_date: string; organization_id?: string };
@@ -65,26 +67,29 @@ type Props = {
 export function EmailsTable({ baseParams, categories = [], mailboxes = [] }: Props) {
   const [filters, setFilters] = useState<EmailFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>('sentAt');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selected, setSelected] = useState<EmailRow | null>(null);
-  const [page, setPage] = useState(1);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'sentAt', desc: true }]);
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 15 });
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
-  // Reset page when filters, sort, or base params (date/hotel) change
-  const resetKey = `${JSON.stringify(filters)}|${sortKey}|${sortDir}|${baseParams.from_date}|${baseParams.to_date}|${baseParams.organization_id ?? ''}`;
+  // Reset to first page when sort, filters, or base params change
+  const resetKey = `${JSON.stringify(filters)}|${JSON.stringify(sorting)}|${baseParams.from_date}|${baseParams.to_date}|${baseParams.organization_id ?? ''}`;
   const [prevResetKey, setPrevResetKey] = useState(resetKey);
   if (resetKey !== prevResetKey) {
     setPrevResetKey(resetKey);
-    setPage(1);
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
   }
 
+  const sort = sorting[0];
   const queryParams = {
     ...baseParams,
-    page,
-    page_size: PAGE_SIZE,
+    page: pagination.pageIndex + 1,
+    page_size: pagination.pageSize,
     include_body: true,
-    sort_by: SORT_KEY_MAP[sortKey],
-    sort_dir: sortDir,
+    ...(sort && {
+      sort_by: SORT_KEY_MAP[sort.id] ?? sort.id,
+      sort_dir: (sort.desc ? 'desc' : 'asc') as 'asc' | 'desc',
+    }),
     ...(filters.mailbox !== 'all' && { mailbox_email: filters.mailbox }),
     ...(filters.category !== 'all' && { category: filters.category }),
     ...(filters.editClass !== 'all' && { edit_class: filters.editClass }),
@@ -105,21 +110,141 @@ export function EmailsTable({ baseParams, categories = [], mailboxes = [] }: Pro
 
   const emails = data ? transformEmails(data.rows) : [];
   const totalCount = data?.total_count ?? 0;
-  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  const effectivePage = Math.min(Math.max(1, page), pageCount);
-  const pageStart = (effectivePage - 1) * PAGE_SIZE;
+  const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
   const activeCount = countActiveFilters(filters);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortKey(key);
-      setSortDir('desc');
-    }
-  };
+  const columns = useMemo<ColumnDef<EmailRow>[]>(
+    () => [
+      {
+        id: 'sentAt',
+        accessorKey: 'sentAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Sent At" />,
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap tabular-nums">
+            {formatShortDateTime(row.original.sentAt)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'mailbox',
+        enableSorting: false,
+        header: 'Mailbox',
+        cell: ({ row }) => (
+          <span className="block max-w-44 truncate text-muted-foreground">
+            {row.original.mailbox}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'category',
+        enableSorting: false,
+        header: 'Category',
+        cell: ({ row }) => row.original.category,
+      },
+      {
+        accessorKey: 'trip',
+        enableSorting: false,
+        header: 'Trip',
+        cell: ({ row }) => row.original.trip,
+      },
+      {
+        accessorKey: 'editClass',
+        enableSorting: false,
+        header: 'Edit Class',
+        cell: ({ row }) => <EditClassBadge value={row.original.editClass} />,
+      },
+      {
+        id: 'editDist',
+        accessorKey: 'editDist',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Edit Dist." />,
+        cell: ({ row }) => {
+          const v = row.original.editDist;
+          return (
+            <span className={cn('tabular-nums font-medium', v === 0 ? 'text-emerald-600' : '')}>
+              {v.toFixed(3)}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'jaccard',
+        accessorKey: 'jaccard',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Jaccard" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-muted-foreground">
+            {row.original.jaccard.toFixed(3)}
+          </span>
+        ),
+      },
+      {
+        id: 'semantic',
+        accessorKey: 'semantic',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Semantic" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium text-emerald-700">
+            {row.original.semantic.toFixed(3)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'subject',
+        enableSorting: false,
+        header: 'Subject',
+        cell: ({ row }) => (
+          <span className="block max-w-60 truncate font-medium">{row.original.subject}</span>
+        ),
+      },
+      {
+        id: 'verdict',
+        accessorKey: 'verdict',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Verdict" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{row.original.verdict ?? '—'}</span>
+        ),
+      },
+      {
+        id: 'failure',
+        accessorKey: 'failure',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Failure" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{row.original.failure ?? '—'}</span>
+        ),
+      },
+      {
+        id: 'actions',
+        enableSorting: false,
+        enableHiding: false,
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelected(row.original)}
+              className="h-8 gap-1 text-primary hover:bg-primary/10 hover:text-primary"
+            >
+              <IconEye className="size-4" />
+              View
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
 
-  const showingFrom = totalCount === 0 ? 0 : pageStart + 1;
-  const showingTo = Math.min(pageStart + PAGE_SIZE, totalCount);
+  const table = useReactTable({
+    data: emails,
+    columns,
+    manualSorting: true,
+    manualPagination: true,
+    pageCount,
+    state: { sorting, pagination, columnVisibility },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+  });
 
   if (isLoading) {
     return (
@@ -139,276 +264,112 @@ export function EmailsTable({ baseParams, categories = [], mailboxes = [] }: Pro
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {isFetching ? (
-            <span className="inline-flex items-center gap-1.5">
-              <IconLoader2 className="size-3 animate-spin" />
-              Loading…
-            </span>
-          ) : (
-            <>{totalCount} email{totalCount !== 1 ? 's' : ''} match current filters</>
-          )}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setFilterOpen(true)}>
-            <IconFilter className="size-4" />
-            Filters
-            {activeCount > 0 && (
-              <span className="ml-1 inline-flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                {activeCount}
-              </span>
-            )}
-          </Button>
-          {activeCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setFilters(EMPTY_FILTERS)}
-              className="text-muted-foreground"
-            >
-              <IconX className="size-4" />
-              Clear
-            </Button>
-          )}
-          <EmailExportButton baseParams={baseParams} filters={filters} />
-        </div>
-      </div>
-
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-card text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="sticky left-0 z-10 w-14 border-r bg-card px-4 py-3 text-left font-medium shadow-[4px_0_6px_-4px_rgba(0,0,0,0.08)]">
-                  #
-                </th>
-                <SortHeader
-                  label="Sent at"
-                  sortKey="sentAt"
-                  current={sortKey}
-                  dir={sortDir}
-                  onClick={toggleSort}
-                />
-                <PlainHeader label="Mailbox" />
-                <PlainHeader label="Category" />
-                <PlainHeader label="Trip" />
-                <PlainHeader label="Edit class" />
-                <SortHeader
-                  label="Edit dist."
-                  sortKey="editDist"
-                  current={sortKey}
-                  dir={sortDir}
-                  onClick={toggleSort}
-                />
-                <SortHeader
-                  label="Jaccard"
-                  sortKey="jaccard"
-                  current={sortKey}
-                  dir={sortDir}
-                  onClick={toggleSort}
-                />
-                <SortHeader
-                  label="Semantic"
-                  sortKey="semantic"
-                  current={sortKey}
-                  dir={sortDir}
-                  onClick={toggleSort}
-                />
-                <PlainHeader label="Subject" />
-                <SortHeader
-                  label="Verdict"
-                  sortKey="verdict"
-                  current={sortKey}
-                  dir={sortDir}
-                  onClick={toggleSort}
-                />
-                <SortHeader
-                  label="Failure"
-                  sortKey="failure"
-                  current={sortKey}
-                  dir={sortDir}
-                  onClick={toggleSort}
-                />
-                <th className="sticky right-0 z-10 border-l bg-card px-4 py-3 text-right font-medium shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.08)]">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {emails.length === 0 ? (
-                <tr>
-                  <td colSpan={13} className="px-6 py-12 text-center text-muted-foreground">
-                    No emails match the current filters.
-                  </td>
-                </tr>
+    <Card>
+      <CardContent>
+        <div className="flex  flex-col gap-4">
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {isFetching ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <IconLoader2 className="size-3 animate-spin" />
+                  Loading…
+                </span>
               ) : (
-                emails.map((row, i) => (
-                  <tr
-                    key={row.id}
-                    className="group border-b bg-card last:border-b-0 hover:bg-muted/40"
-                  >
-                    <td className="sticky left-0 z-10 border-r bg-card px-4 py-4 tabular-nums text-muted-foreground shadow-[4px_0_6px_-4px_rgba(0,0,0,0.08)] group-hover:bg-muted/40">
-                      {pageStart + i + 1}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-4 tabular-nums">
-                      {formatShortDateTime(row.sentAt)}
-                    </td>
-                    <td className="max-w-45 truncate px-4 py-4 text-muted-foreground">
-                      {row.mailbox}
-                    </td>
-                    <td className="px-4 py-4">{row.category}</td>
-                    <td className="px-4 py-4">{row.trip}</td>
-                    <td className="px-4 py-4">
-                      <EditClassBadge value={row.editClass} />
-                    </td>
-                    <td
-                      className={cn(
-                        'px-4 py-4 tabular-nums font-medium',
-                        row.editDist === 0 ? 'text-emerald-600' : 'text-foreground'
-                      )}
-                    >
-                      {row.editDist.toFixed(3)}
-                    </td>
-                    <td className="px-4 py-4 tabular-nums text-muted-foreground">
-                      {row.jaccard.toFixed(3)}
-                    </td>
-                    <td className="px-4 py-4 tabular-nums font-medium text-emerald-700">
-                      {row.semantic.toFixed(3)}
-                    </td>
-                    <td className="max-w-60 truncate px-4 py-4 font-medium">{row.subject}</td>
-                    <td className="px-4 py-4 text-muted-foreground">{row.verdict ?? '—'}</td>
-                    <td className="px-4 py-4 text-muted-foreground">{row.failure ?? '—'}</td>
-                    <td className="sticky right-0 z-10 border-l bg-card px-4 py-3 text-right shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.08)] group-hover:bg-muted/40">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelected(row)}
-                        className="h-8 gap-1 text-primary hover:bg-primary/10 hover:text-primary"
-                      >
-                        <IconEye className="size-4" />
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                <>
+                  {totalCount} email{totalCount !== 1 ? 's' : ''} match current filters
+                </>
               )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm">
-          <p className="text-muted-foreground">
-            Showing <span className="tabular-nums font-medium text-foreground">{showingFrom}</span>–
-            <span className="tabular-nums font-medium text-foreground">{showingTo}</span> of{' '}
-            <span className="tabular-nums font-medium text-foreground">{totalCount}</span>
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8"
-              disabled={effectivePage === 1}
-              onClick={() => setPage(1)}
-              aria-label="First page"
-            >
-              <IconChevronsLeft className="size-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8"
-              disabled={effectivePage === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              aria-label="Previous page"
-            >
-              <IconChevronLeft className="size-4" />
-            </Button>
-            <span className="mx-2 text-sm tabular-nums text-muted-foreground">
-              Page <span className="font-medium text-foreground">{effectivePage}</span> of{' '}
-              <span className="font-medium text-foreground">{pageCount}</span>
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8"
-              disabled={effectivePage >= pageCount}
-              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-              aria-label="Next page"
-            >
-              <IconChevronRight className="size-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8"
-              disabled={effectivePage >= pageCount}
-              onClick={() => setPage(pageCount)}
-              aria-label="Last page"
-            >
-              <IconChevronsRight className="size-4" />
-            </Button>
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setFilterOpen(true)}>
+                <IconFilter className="size-4" />
+                Filters
+                {activeCount > 0 && (
+                  <span className="ml-1 inline-flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                    {activeCount}
+                  </span>
+                )}
+              </Button>
+              {activeCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFilters(EMPTY_FILTERS)}
+                  className="text-muted-foreground"
+                >
+                  <IconX className="size-4" />
+                  Clear
+                </Button>
+              )}
+              <EmailExportButton baseParams={baseParams} filters={filters} />
+            </div>
           </div>
+
+          {/* Table */}
+          {/* <Card className="overflow-hidden p-0 b"> */}
+            <div className="overflow-x-auto border rounded-xl">
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((hg) => (
+                    <TableRow
+                      key={hg.id}
+                      className="bg-card text-xs uppercase tracking-wider text-muted-foreground"
+                    >
+                      {hg.headers.map((header) => (
+                        <TableHead key={header.id} className="whitespace-nowrap">
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(header.column.columnDef.header, header.getContext())}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={columns.length}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        No emails match the current filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow key={row.id} className="bg-card hover:bg-muted/40">
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className=" py-3">
+              <DataTablePagination table={table} />
+            </div>
+          {/* </Card> */}
+
+          <EmailsFilterSheet
+            open={filterOpen}
+            onOpenChange={setFilterOpen}
+            value={filters}
+            onApply={setFilters}
+            mailboxes={mailboxes}
+            categories={categories}
+          />
+
+          <EmailDetailSheet email={selected} onClose={() => setSelected(null)} />
         </div>
-      </Card>
 
-      <EmailsFilterSheet
-        open={filterOpen}
-        onOpenChange={setFilterOpen}
-        value={filters}
-        onApply={setFilters}
-        mailboxes={mailboxes}
-        categories={categories}
-      />
+      </CardContent>
+    </Card>
 
-      <EmailDetailSheet email={selected} onClose={() => setSelected(null)} />
-    </div>
-  );
-}
-
-function PlainHeader({ label, align = 'left' }: { label: string; align?: 'left' | 'right' }) {
-  return (
-    <th
-      className={cn(
-        'whitespace-nowrap px-4 py-3 text-left font-medium',
-        align === 'right' && 'text-right'
-      )}
-    >
-      {label}
-    </th>
-  );
-}
-
-function SortHeader({
-  label,
-  sortKey,
-  current,
-  dir,
-  onClick,
-  align = 'left',
-}: {
-  label: string;
-  sortKey: SortKey;
-  current: SortKey;
-  dir: SortDir;
-  onClick: (key: SortKey) => void;
-  align?: 'left' | 'right';
-}) {
-  const active = current === sortKey;
-  const Icon = !active ? IconArrowsSort : dir === 'asc' ? IconSortAscending : IconSortDescending;
-  return (
-    <th
-      className={cn(
-        'cursor-pointer select-none whitespace-nowrap px-4 py-3 text-left font-medium hover:text-foreground',
-        align === 'right' && 'text-right'
-      )}
-      onClick={() => onClick(sortKey)}
-    >
-      <span className={cn('inline-flex items-center gap-1', active && 'text-foreground')}>
-        {label}
-        <Icon className="size-3" />
-      </span>
-    </th>
   );
 }
