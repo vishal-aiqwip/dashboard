@@ -33,7 +33,6 @@ import { OverallSplitPie } from './_components/overall-split-pie';
 import { StatCardGrid } from './_components/stat-card-grid';
 import {
   transformCategoryAnalysis,
-  transformEmails,
   transformHotelOverview,
   transformJudgeBreakdown,
   transformKpis,
@@ -129,13 +128,6 @@ export default function EmailPerformancePage() {
     retry: 1,
   });
 
-  const { data: rawEmails, isLoading: emailsLoading, error: emailsError } = useQuery({
-    queryKey: ['ea-emails', from_date, to_date, organization_id],
-    queryFn: () =>
-      emailPerformanceService.getEmails({ ...baseParams, page_size: 500, include_body: true }),
-    staleTime: STALE,
-    retry: 1,
-  });
 
   // Judge breakdown — only fetched for "All hotels" view
   const isAllHotels = hotelId === ALL_HOTELS;
@@ -156,8 +148,11 @@ export default function EmailPerformancePage() {
   const ts = rawTimeseries ? transformTimeseries(rawTimeseries) : undefined;
   const cat = rawCategory ? transformCategoryAnalysis(rawCategory) : undefined;
   const hotels = rawHotels ? transformHotelOverview(rawHotels) : undefined;
-  const emails = rawEmails ? transformEmails(rawEmails.rows) : [];
   const judgeBreakdown = rawJudge ? transformJudgeBreakdown(rawJudge) : undefined;
+
+  // Derive available filter options from already-fetched data
+  const availableCategories = cat?.categorySummary.map((c) => c.key) ?? [];
+  const availableMailboxes = hotels?.hotels.map((h) => h.mailbox) ?? [];
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -256,13 +251,11 @@ export default function EmailPerformancePage() {
 
         {/* ── Emails ───────────────────────────────────────────────────────── */}
         <TabsContent value="emails">
-          {emailsLoading ? (
-            <Loading label="Loading emails…" />
-          ) : emailsError ? (
-            <p className="text-sm text-red-500">Failed to load emails: {(emailsError as Error).message}</p>
-          ) : (
-            <EmailsTable emails={emails} />
-          )}
+          <EmailsTable
+            baseParams={baseParams}
+            categories={availableCategories}
+            mailboxes={availableMailboxes}
+          />
         </TabsContent>
 
         {/* ── Hotels ───────────────────────────────────────────────────────── */}

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
+import { useQuery } from '@tanstack/react-query';
 import {
   IconArrowsSort,
   IconChevronLeft,
@@ -9,6 +10,7 @@ import {
   IconDownload,
   IconEye,
   IconFilter,
+  IconLoader2,
   IconSortAscending,
   IconSortDescending,
   IconX,
@@ -25,12 +27,24 @@ import {
   EMPTY_FILTERS,
   type EmailFilters,
 } from '@/pages/email-performance/_components/emails-filters';
+import { transformEmails } from '@/pages/email-performance/_data/transform';
 import type { EmailRow } from '@/pages/email-performance/_data/mock';
+import { emailPerformanceService } from '@/services/emailPerformance/emailPerformance';
 
 type SortKey = 'sentAt' | 'editDist' | 'jaccard' | 'semantic' | 'verdict' | 'failure';
 type SortDir = 'asc' | 'desc';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
+const STALE = 5 * 60 * 1000;
+
+const SORT_KEY_MAP: Record<SortKey, string> = {
+  sentAt: 'sent_at',
+  editDist: 'edit_distance_ratio',
+  jaccard: 'jaccard_distance',
+  semantic: 'semantic_similarity',
+  verdict: 'verdict',
+  failure: 'primary_failure',
+};
 
 function formatShortDateTime(iso: string) {
   const d = new Date(iso);
@@ -40,40 +54,15 @@ function formatShortDateTime(iso: string) {
   )}`;
 }
 
-function applyFilters(rows: EmailRow[], f: EmailFilters): EmailRow[] {
-  const min = f.editDistMin === '' ? null : Number(f.editDistMin);
-  const max = f.editDistMax === '' ? null : Number(f.editDistMax);
-  const q = f.search.trim().toLowerCase();
-  return rows.filter((r) => {
-    if (f.mailbox !== 'all' && r.mailbox !== f.mailbox) return false;
-    if (f.category !== 'all' && r.category !== f.category) return false;
-    if (f.editClass !== 'all' && r.editClass !== f.editClass) return false;
-    if (f.tripType !== 'all' && r.trip !== f.tripType) return false;
-    if (f.verdict !== 'all' && r.verdict !== f.verdict) return false;
-    if (f.failureType !== 'all' && r.failure !== f.failureType) return false;
-    if (min !== null && !Number.isNaN(min) && r.editDist < min) return false;
-    if (max !== null && !Number.isNaN(max) && r.editDist > max) return false;
-    if (q) {
-      const haystack = `${r.subject} ${r.guestEmail} ${r.aiDraft} ${r.finalSent}`.toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
-    return true;
-  });
-}
+type BaseParams = { from_date: string; to_date: string; organization_id?: string };
 
-function sortRows(rows: EmailRow[], key: SortKey, dir: SortDir): EmailRow[] {
-  const sign = dir === 'asc' ? 1 : -1;
-  return [...rows].sort((a, b) => {
-    const av: string | number | null = a[key] ?? '';
-    const bv: string | number | null = b[key] ?? '';
-    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sign;
-    return String(av).localeCompare(String(bv)) * sign;
-  });
-}
+type Props = {
+  baseParams: BaseParams;
+  categories?: string[];
+  mailboxes?: string[];
+};
 
-type Props = { emails: EmailRow[] };
-
-export function EmailsTable({ emails }: Props) {
+export function EmailsTable({ baseParams, categories = [], mailboxes = [] }: Props) {
   const [filters, setFilters] = useState<EmailFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('sentAt');
@@ -81,24 +70,45 @@ export function EmailsTable({ emails }: Props) {
   const [selected, setSelected] = useState<EmailRow | null>(null);
   const [page, setPage] = useState(1);
 
-  const filtered = useMemo(() => applyFilters(emails, filters), [emails, filters]);
-  const sorted = useMemo(() => sortRows(filtered, sortKey, sortDir), [filtered, sortKey, sortDir]);
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-
-  const filterKey = `${JSON.stringify(filters)}|${sortKey}|${sortDir}`;
-  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
-  if (filterKey !== prevFilterKey) {
-    setPrevFilterKey(filterKey);
+  // Reset page when filters, sort, or base params (date/hotel) change
+  const resetKey = `${JSON.stringify(filters)}|${sortKey}|${sortDir}|${baseParams.from_date}|${baseParams.to_date}|${baseParams.organization_id ?? ''}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
     setPage(1);
   }
 
+  const queryParams = {
+    ...baseParams,
+    page,
+    page_size: PAGE_SIZE,
+    include_body: true,
+    sort_by: SORT_KEY_MAP[sortKey],
+    sort_dir: sortDir,
+    ...(filters.mailbox !== 'all' && { mailbox_email: filters.mailbox }),
+    ...(filters.category !== 'all' && { category: filters.category }),
+    ...(filters.editClass !== 'all' && { edit_class: filters.editClass }),
+    ...(filters.tripType !== 'all' && { trip_type: filters.tripType }),
+    ...(filters.verdict !== 'all' && { verdict: filters.verdict }),
+    ...(filters.failureType !== 'all' && { primary_failure: filters.failureType }),
+    ...(filters.editDistMin !== '' && { min_edit_distance: Number(filters.editDistMin) }),
+    ...(filters.editDistMax !== '' && { max_edit_distance: Number(filters.editDistMax) }),
+    ...(filters.search.trim() !== '' && { search_text: filters.search.trim() }),
+  };
+
+  const { data, isLoading, isFetching, error } = useQuery({
+    queryKey: ['ea-emails', queryParams],
+    queryFn: () => emailPerformanceService.getEmails(queryParams),
+    staleTime: STALE,
+    retry: 1,
+  });
+
+  const emails = data ? transformEmails(data.rows) : [];
+  const totalCount = data?.total_count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const effectivePage = Math.min(Math.max(1, page), pageCount);
   const pageStart = (effectivePage - 1) * PAGE_SIZE;
-  const paged = sorted.slice(pageStart, pageStart + PAGE_SIZE);
   const activeCount = countActiveFilters(filters);
-
-  const mailboxes = useMemo(() => Array.from(new Set(emails.map((e) => e.mailbox))), [emails]);
-  const categories = useMemo(() => Array.from(new Set(emails.map((e) => e.category))), [emails]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -108,14 +118,38 @@ export function EmailsTable({ emails }: Props) {
     }
   };
 
-  const showingFrom = sorted.length === 0 ? 0 : pageStart + 1;
-  const showingTo = Math.min(pageStart + PAGE_SIZE, sorted.length);
+  const showingFrom = totalCount === 0 ? 0 : pageStart + 1;
+  const showingTo = Math.min(pageStart + PAGE_SIZE, totalCount);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+        <IconLoader2 className="size-4 animate-spin" />
+        Loading emails…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <p className="text-sm text-red-500">
+        Failed to load emails: {(error as Error).message}
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {sorted.length} email{sorted.length !== 1 ? 's' : ''} match current filters
+          {isFetching ? (
+            <span className="inline-flex items-center gap-1.5">
+              <IconLoader2 className="size-3 animate-spin" />
+              Loading…
+            </span>
+          ) : (
+            <>{totalCount} email{totalCount !== 1 ? 's' : ''} match current filters</>
+          )}
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setFilterOpen(true)}>
@@ -206,14 +240,14 @@ export function EmailsTable({ emails }: Props) {
               </tr>
             </thead>
             <tbody>
-              {paged.length === 0 ? (
+              {emails.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="px-6 py-12 text-center text-muted-foreground">
                     No emails match the current filters.
                   </td>
                 </tr>
               ) : (
-                paged.map((row, i) => (
+                emails.map((row, i) => (
                   <tr
                     key={row.id}
                     className="group border-b bg-card last:border-b-0 hover:bg-muted/40"
@@ -271,7 +305,7 @@ export function EmailsTable({ emails }: Props) {
           <p className="text-muted-foreground">
             Showing <span className="tabular-nums font-medium text-foreground">{showingFrom}</span>–
             <span className="tabular-nums font-medium text-foreground">{showingTo}</span> of{' '}
-            <span className="tabular-nums font-medium text-foreground">{sorted.length}</span>
+            <span className="tabular-nums font-medium text-foreground">{totalCount}</span>
           </p>
           <div className="flex items-center gap-1">
             <Button

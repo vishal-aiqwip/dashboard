@@ -8,7 +8,6 @@ import type {
 } from '@/services/emailPerformance/emailPerformance';
 
 import type {
-  CategoryKey,
   CategoryRow,
   EditClass,
   EmailPerformanceData,
@@ -139,7 +138,7 @@ export function transformCategoryAnalysis(raw: EACategoryAnalysisResponse): Pick
   const categoryWeekHeatmap = raw?.charts?.category_week_heatmap ?? [];
 
   const categorySummary: CategoryRow[] = categoryAggregates.map((agg) => ({
-    key: agg.category as CategoryKey,
+    key: agg.category,
     label: categoryLabel(agg.category),
     emails: agg.email_count ?? 0, // BQ returns email_count (not count)
     avgEditDistance: agg.avg_edit_distance ?? 0,
@@ -147,8 +146,26 @@ export function transformCategoryAnalysis(raw: EACategoryAnalysisResponse): Pick
     acceptance: agg.acceptance_rate_pct ?? 0,
   }));
 
-  const editDistanceByCategory =
-    editDistanceByCategoryOverTime as unknown as EmailPerformanceData['editDistanceByCategory'];
+  // Pivot flat {date, category, avg_edit_distance} rows → {date, [cat]: number, ...}
+  // so recharts can use each category name as a dataKey.
+  // Also collect the full set of categories so every date row has every category key
+  // (defaults to 0) — this makes all Area components visible, not just the one with data.
+  const allCategories = new Set<string>(editDistanceByCategoryOverTime.map((r) => r.category));
+  const dateMap = new Map<string, Record<string, number | string>>();
+  for (const row of editDistanceByCategoryOverTime) {
+    if (!dateMap.has(row.date)) dateMap.set(row.date, { date: row.date });
+    dateMap.get(row.date)![row.category] = row.avg_edit_distance ?? 0;
+  }
+  // Fill 0 for any category not present on a given date so every Area renders
+  for (const obj of dateMap.values()) {
+    for (const cat of allCategories) {
+      if (!(cat in obj)) obj[cat] = 0;
+    }
+  }
+  const editDistanceByCategory: EmailPerformanceData['editDistanceByCategory'] =
+    Array.from(dateMap.values()).sort((a, b) =>
+      String(a.date).localeCompare(String(b.date)),
+    );
 
   // BQ returns flat {category, week, avg_edit_distance, email_count} rows — group by category
   const heatmapByCat = new Map<string, { week: string; value: number }[]>();
@@ -255,11 +272,10 @@ export function transformEmails(rows: EAEmailRow[]): EmailRow[] {
     semantic: r.semantic_similarity ?? 0,
     verdict: r.verdict,
     failure: r.primary_failure,
-    subject: r.subject ?? '',
-    guestFrom: r.guest_from ?? '',
-    guestEmail: r.guest_email ?? '',
-    aiDraft: r.ai_draft ?? '',
-    finalSent: r.final_sent ?? '',
-    toolCalls: r.tool_calls,
+    subject: r.original_subject ?? '',
+    guestFrom: r.original_sender ?? '',
+    guestEmail: r.original_body_preview ?? '',
+    aiDraft: r.ai_draft_preview ?? '',
+    finalSent: r.final_sent_preview ?? '',
   }));
 }

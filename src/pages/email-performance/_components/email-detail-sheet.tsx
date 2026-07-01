@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
-import { IconChevronDown, IconChevronRight, IconMail } from '@tabler/icons-react';
+import { useQuery } from '@tanstack/react-query';
+import { IconChevronDown, IconChevronRight, IconLoader2, IconMail } from '@tabler/icons-react';
+import { Mail, Wrench } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { editClassBadgeClasses } from '@/pages/email-performance/_components/edit-class-colors';
 import type { EmailRow } from '@/pages/email-performance/_data/mock';
+import { emailPerformanceService } from '@/services/emailPerformance/emailPerformance';
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -42,6 +45,27 @@ export function EmailDetailSheet({ email, onClose }: Props) {
 }
 
 function EmailDetailBody({ email }: { email: EmailRow }) {
+  const { data: tcData, isLoading: tcLoading } = useQuery({
+    queryKey: ['ea-tool-calls', email.id],
+    queryFn: () => emailPerformanceService.getToolCalls(email.id),
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+
+  const toolCalls = (tcData?.tool_calls ?? []).map((tc) => ({
+    tool: tc.tool,
+    status: (tc.status === 'success' ? 'success' : 'error') as 'success' | 'error',
+    provider: tc.system ?? undefined,
+    args: (() => {
+      try { return tc.argument_json ? JSON.parse(tc.argument_json) : {}; }
+      catch { return { raw: tc.argument_json }; }
+    })(),
+    output: (() => {
+      try { return tc.output_json ? JSON.parse(tc.output_json) : ''; }
+      catch { return tc.output_json ?? ''; }
+    })(),
+  }));
+
   return (
     <>
       <SheetHeader className="border-b px-6 py-4 gap-2">
@@ -84,9 +108,14 @@ function EmailDetailBody({ email }: { email: EmailRow }) {
 
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-3xl flex-col gap-4 p-6">
-            {email.toolCalls && email.toolCalls.length > 0 && (
-              <ToolCallsBlock calls={email.toolCalls} />
-            )}
+            {tcLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <IconLoader2 className="size-3 animate-spin" />
+                Loading tool calls…
+              </div>
+            ) : toolCalls.length > 0 ? (
+              <ToolCallsBlock calls={toolCalls} />
+            ) : null}
             <GuestEmailBlock email={email} />
             <DiffBlock aiDraft={email.aiDraft} finalSent={email.finalSent} />
           </div>
@@ -120,21 +149,21 @@ function CollapsibleHeader({
       ) : (
         <IconChevronRight className="size-4 text-muted-foreground" />
       )}
-      <span className="font-semibold">{title}</span>
+      <span className="font-semibold flex items-center gap-2">{title}</span>
       {badge}
       {right && <span className="ml-auto">{right}</span>}
     </button>
   );
 }
 
-function ToolCallsBlock({ calls }: { calls: NonNullable<EmailRow['toolCalls']> }) {
+function ToolCallsBlock({ calls }: { calls: LiveToolCall[] }) {
   const [open, setOpen] = useState(true);
   return (
     <div className="overflow-hidden rounded-lg border bg-card">
       <CollapsibleHeader
         open={open}
         onToggle={() => setOpen((o) => !o)}
-        title={<>🔧 TOOL CALLS</>}
+        title={<><Wrench className="size-3.5" /> TOOL CALLS</>}
         badge={
           <span className="text-xs text-muted-foreground">
             ({calls.length} call{calls.length > 1 ? 's' : ''})
@@ -152,8 +181,16 @@ function ToolCallsBlock({ calls }: { calls: NonNullable<EmailRow['toolCalls']> }
   );
 }
 
-function ToolCall({ call }: { call: NonNullable<EmailRow['toolCalls']>[number] }) {
-  const [showDetails, setShowDetails] = useState(true);
+type LiveToolCall = {
+  tool: string;
+  status: 'success' | 'error';
+  provider?: string;
+  args: Record<string, unknown>;
+  output: unknown;
+};
+
+function ToolCall({ call }: { call: LiveToolCall }) {
+  const [showDetails, setShowDetails] = useState(false);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-xs">
@@ -183,21 +220,27 @@ function ToolCall({ call }: { call: NonNullable<EmailRow['toolCalls']>[number] }
       </div>
       {showDetails && (
         <div className="grid gap-3 rounded-md bg-muted/30 p-3 text-xs">
-          <div>
+          <div className="min-w-0">
             <div className="mb-1 font-semibold uppercase tracking-wider text-muted-foreground">
               Arguments
             </div>
-            <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed">
-              {JSON.stringify(call.args, null, 2)}
-            </pre>
+            <div className="overflow-x-auto">
+              <pre className="whitespace-pre font-mono text-[11px] leading-relaxed">
+                {JSON.stringify(call.args, null, 2)}
+              </pre>
+            </div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="mb-1 font-semibold uppercase tracking-wider text-muted-foreground">
               Output
             </div>
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed">
-              {call.output}
-            </pre>
+            <div className="max-h-48 overflow-y-auto overflow-x-auto">
+              <pre className="whitespace-pre font-mono text-[11px] leading-relaxed">
+                {typeof call.output === 'string'
+                  ? call.output
+                  : JSON.stringify(call.output, null, 2)}
+              </pre>
+            </div>
           </div>
         </div>
       )}
@@ -212,7 +255,7 @@ function GuestEmailBlock({ email }: { email: EmailRow }) {
       <CollapsibleHeader
         open={open}
         onToggle={() => setOpen((o) => !o)}
-        title={<>📨 GUEST EMAIL</>}
+        title={<><Mail className="size-3.5" /> GUEST EMAIL</>}
         right={<span className="text-xs text-muted-foreground">from {email.guestFrom}</span>}
       />
       {open && (

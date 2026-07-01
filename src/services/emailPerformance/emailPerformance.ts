@@ -89,27 +89,31 @@ export type EATimeseriesResponse = {
 export type EAEmailRow = {
   interaction_id: string;
   sent_at: string;
+  organization_id: string | null;
   mailbox_email: string;
   category: string | null;
   trip_type: string | null;
   edit_class: string | null;
-  edit_distance_ratio: number; // BQ alias: ROUND(COALESCE(edit_distance_ratio, 0), 4) AS edit_distance_ratio
+  edit_distance_ratio: number;
   jaccard_distance: number;
   semantic_similarity: number;
+  draft_token_count: number | null;
+  final_token_count: number | null;
+  original_subject: string | null;   // backend column: original_subject
+  original_sender: string | null;    // backend column: original_sender
   verdict: string | null;
   primary_failure: string | null;
-  subject: string | null;
-  guest_from: string | null;
-  guest_email: string | null;
-  ai_draft: string | null;
-  final_sent: string | null;
-  tool_calls?: {
-    tool: string;
-    status: 'success' | 'error';
-    provider?: string;
-    args: Record<string, unknown>;
-    output: string;
-  }[];
+  root_cause: string | null;
+  fix_layer: string | null;
+  judge_summary: string | null;
+  missed_operational_outcome: string | null;
+  specific_fix: string | null;
+  fact_status: string | null;
+  could_be_fixed_without_new_systems: string | null;
+  // only present when include_body=true
+  ai_draft_preview?: string | null;
+  final_sent_preview?: string | null;
+  original_body_preview?: string | null;
 };
 
 export type EAEmailListParams = EABaseParams & {
@@ -153,11 +157,20 @@ export type EACategoryHeatmapRow = {
   email_count: number;
 };
 
+// Flat BQ row from ea_edit_distance_by_category — pivoted into columns per category in the transform
+export type EACategoryDailyFlatRow = {
+  date: string;
+  category: string;
+  avg_edit_distance: number | null;
+  median_edit_distance: number | null;
+  email_count: number;
+};
+
 export type EACategoryAnalysisResponse = {
   date_range: { from_date: string; to_date: string };
   organization_id: string | null;
   charts: {
-    edit_distance_by_category_over_time: Array<{ date: string } & Record<string, number | string>>;
+    edit_distance_by_category_over_time: EACategoryDailyFlatRow[];
     category_aggregates: EACategoryAggRow[];
     category_week_heatmap: EACategoryHeatmapRow[];
   };
@@ -212,6 +225,23 @@ export type EAJudgeBreakdownResponse = {
     by_fact_status: EABreakdownEntry[];
     by_could_be_fixed_without_new_systems: EABreakdownEntry[];
   };
+};
+
+// ── Tool Calls ────────────────────────────────────────────────────────────────
+
+export type EAToolCallRow = {
+  tool_call_id: string;
+  system: string | null;
+  tool: string;
+  argument_json: string | null;
+  output_json: string | null;
+  status: string;
+  error_message: string | null;
+  inserted_at: string;
+};
+
+export type EAToolCallsResponse = {
+  tool_calls: EAToolCallRow[];
 };
 
 // ── Service helpers ────────────────────────────────────────────────────────────
@@ -288,6 +318,17 @@ export const emailPerformanceService = {
       return unwrap<EAJudgeBreakdownResponse>(data);
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Failed to fetch judge breakdown'));
+    }
+  },
+
+  getToolCalls: async (interactionId: string): Promise<EAToolCallsResponse> => {
+    try {
+      const { data } = await axiosApi.get<unknown>(
+        `/email-assistant-stats/emails/${encodeURIComponent(interactionId)}/tool-calls`,
+      );
+      return unwrap<EAToolCallsResponse>(data);
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to fetch tool calls'));
     }
   },
 };

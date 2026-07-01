@@ -30,8 +30,8 @@ type EmailsFilterSheetProps = {
 
 const EDIT_CLASSES = ['accepted', 'light', 'medium', 'heavy', 'rewritten'];
 const TRIP_TYPES = ['Leisure', 'Business', 'Group'];
-const VERDICTS = ['needs_review', 'rejected', 'approved'];
-const FAILURES = ['hallucination', 'policy', 'format', 'tone'];
+const VERDICTS = ['good', 'acceptable', 'poor', 'wrong', 'missed_outcome'];
+const FAILURES = ['hallucination', 'wrong_info', 'missing_info', 'tone', 'policy', 'format', 'unnecessary_question'];
 
 export function EmailsFilterSheet({
   open,
