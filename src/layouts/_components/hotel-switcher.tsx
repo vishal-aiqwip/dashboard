@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { IconBuildingSkyscraper, IconCheck, IconSelector } from '@tabler/icons-react';
 
@@ -18,19 +19,47 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import type { Hotel } from '@/config/sidebar-nav';
+import { useAppDispatch, useAppSelector } from '@/redux/hooks';
+import { setSelectedOrg } from '@/redux/reducer/selectedOrgReducer';
+import { organizationService } from '@/services/organizations/organizations';
 
-type HotelSwitcherProps = {
-  hotels: Hotel[];
-};
-
-export function HotelSwitcher({ hotels }: HotelSwitcherProps) {
+export function HotelSwitcher() {
   const { isMobile } = useSidebar();
   const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState(hotels[0]?.id ?? '');
-  const selected = hotels.find((h) => h.id === selectedId) ?? hotels[0];
+  const dispatch = useAppDispatch();
+  const selectedOrg = useAppSelector((state: any) => state.selectedOrg.selectedOrg);
 
-  if (!selected) return null;
+  const { data: orgs = [] } = useQuery({
+    queryKey: ['orgs-all'],
+    queryFn: organizationService.listAll,
+  });
+
+  // Auto-select first org on load
+  useEffect(() => {
+    if (orgs.length > 0 && !selectedOrg) {
+      dispatch(setSelectedOrg(orgs[0]!));
+    }
+  }, [orgs, selectedOrg, dispatch]);
+
+  const selected = selectedOrg ?? orgs[0];
+
+  if (!selected && orgs.length === 0) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton size="lg" disabled>
+            <div className="bg-sidebar-accent flex size-9 shrink-0 items-center justify-center rounded-md">
+              <IconBuildingSkyscraper className="size-5 opacity-40" />
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="text-muted-foreground text-[10px] uppercase tracking-wide">Your Hotel</span>
+              <span className="truncate text-xs text-muted-foreground">Loading…</span>
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
 
   return (
     <SidebarMenu>
@@ -40,7 +69,7 @@ export function HotelSwitcher({ hotels }: HotelSwitcherProps) {
             <SidebarMenuButton
               size="lg"
               className="group-data-[collapsible=icon]:size-9! data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-              tooltip={selected.name}
+              tooltip={selected?.name ?? 'Select hotel'}
             >
               <div className="bg-sidebar-accent text-primary flex size-9 shrink-0 items-center justify-center rounded-md group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:bg-transparent">
                 <IconBuildingSkyscraper className="size-5" />
@@ -49,13 +78,13 @@ export function HotelSwitcher({ hotels }: HotelSwitcherProps) {
                 <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
                   Your Hotel
                 </span>
-                <span className="truncate font-medium">{selected.name}</span>
+                <span className="truncate font-medium">{selected?.name ?? '—'}</span>
               </div>
               <IconSelector className="ml-auto size-4 opacity-60 group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </PopoverTrigger>
           <PopoverContent
-            className="w-[400px] p-0"
+            className="w-100 p-0"
             side={isMobile ? 'bottom' : 'right'}
             align="start"
             sideOffset={8}
@@ -65,22 +94,22 @@ export function HotelSwitcher({ hotels }: HotelSwitcherProps) {
               <CommandList className="max-h-80">
                 <CommandEmpty>No hotels found.</CommandEmpty>
                 <CommandGroup heading="Hotels">
-                  {hotels.map((hotel) => (
+                  {orgs.map((org) => (
                     <CommandItem
-                      key={hotel.id}
-                      value={hotel.name}
+                      key={org.id}
+                      value={org.name}
                       onSelect={() => {
-                        setSelectedId(hotel.id);
+                        dispatch(setSelectedOrg(org));
                         setOpen(false);
                       }}
                       className="data-selected:bg-accent data-selected:text-accent-foreground data-selected:*:[svg]:text-accent-foreground"
                     >
                       <IconBuildingSkyscraper className="size-4 opacity-70" />
-                      <span className="flex-1 truncate">{hotel.name}</span>
+                      <span className="flex-1 truncate">{org.name}</span>
                       <IconCheck
                         className={cn(
                           'size-4',
-                          hotel.id === selected.id ? 'opacity-100' : 'opacity-0'
+                          org.id === selected?.id ? 'opacity-100' : 'opacity-0'
                         )}
                       />
                     </CommandItem>

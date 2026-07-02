@@ -19,6 +19,7 @@ const BetaFeaturesPage = lazy(() => import('@/pages/manage-hotels/beta-features'
 const ChatbotsPage = lazy(() => import('@/pages/manage-hotels/chatbots'));
 const SecurityPage = lazy(() => import('@/pages/manage-hotels/security'));
 const ChatbotTestPage = lazy(() => import('@/pages/chatbot-test'));
+const ChatbotTrainingCenterPage = lazy(() => import('@/pages/chatbot-training-center'));
 const EmailTrainingCenterPage = lazy(() => import('@/pages/email-training-center'));
 
 const ReportAssessmentsLayout = lazy(() => import('@/pages/report-assessments/layout'));
@@ -159,6 +160,14 @@ const router = createBrowserRouter([
             element: (
               <LazyPage>
                 <ChatbotTestPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'chatbot/training-center',
+            element: (
+              <LazyPage>
+                <ChatbotTrainingCenterPage />
               </LazyPage>
             ),
           },

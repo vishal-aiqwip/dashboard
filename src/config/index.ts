@@ -1,8 +1,8 @@
 export const CONFIG = {
     APP_NAME: import.meta.env.VITE_APP_NAME || 'Chat Agent',
     API_URL: import.meta.env.VITE_API_URL || '',
+    CHATBOT_PREVIEW_URL: (import.meta.env.VITE_CHATBOT_PREVIEW_URL as string | undefined)?.replace(/\/$/, '') || '',
     IS_DEV: import.meta.env.VITE_NODE_ENV === 'dev',
-    // Add other config values
   };
 
 

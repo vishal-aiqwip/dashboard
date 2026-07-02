@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sidebar';
 import Logo from '@/components/logo';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { HOTELS, NAV_SECTIONS } from '@/config/sidebar-nav';
+import { NAV_SECTIONS } from '@/config/sidebar-nav';
 import { HotelSwitcher } from '@/layouts/_components/hotel-switcher';
 import { NavSection, isItemActive } from '@/layouts/_components/nav-section';
 import { NavUser } from '@/layouts/_components/nav-user';
@@ -70,7 +70,7 @@ export function AppSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
         <hr/>
-        <HotelSwitcher hotels={HOTELS} />
+        <HotelSwitcher />
 
       </SidebarHeader>
 
