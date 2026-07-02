@@ -398,6 +398,16 @@ export const reportAssessmentsService = {
     }
   },
 
+  listBenchmarks: async (params?: { limit?: number; offset?: number }): Promise<{ benchmarks: Record<string, unknown>[]; total: number }> => {
+    try {
+      const { data } = await axiosApi.get<unknown>('/api/email-reports/benchmarks', { params });
+      const payload = unwrap<{ benchmarks: Record<string, unknown>[]; total?: number; count?: number }>(data);
+      return { benchmarks: payload.benchmarks ?? [], total: payload.total ?? payload.count ?? 0 };
+    } catch (e) {
+      throw apiErr(e, 'Failed to fetch benchmarks');
+    }
+  },
+
   getPublicReport: async (params: {
     v: string;
     rid: string;

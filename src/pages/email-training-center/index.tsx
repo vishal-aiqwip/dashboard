@@ -266,7 +266,7 @@ export default function EmailTrainingCenterPage() {
     ...(filters.editDistMin !== '' && { min_edit_distance: parseFloat(filters.editDistMin) }),
     ...(filters.editDistMax !== '' && { max_edit_distance: parseFloat(filters.editDistMax) }),
     ...(filters.search.trim() !== '' && { search_text: filters.search.trim() }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [from_date, to_date, hotelOrgId, activeMailbox, pagination.pageIndex, pagination.pageSize, sort, filters]);
 
   const { data: emailsData, isLoading: emailsLoading, isFetching: emailsFetching } = useQuery({
@@ -516,74 +516,7 @@ export default function EmailTrainingCenterPage() {
       </div>
 
       {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(420px,1.05fr)_minmax(0,1.95fr)] gap-6 items-start">
-        {/* Left: Prompt editor */}
-        <div className="min-w-0">
-          <Card className="min-w-0 border border-border/60 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Prompt Configuration</CardTitle>
-              <CardDescription className="text-xs">Organization writing guidelines plus the selected mailbox's learned style, overrides, and custom tool prompt.</CardDescription>
-            </CardHeader>
-            <CardContent className="min-w-0 space-y-5">
-              <div className="flex gap-2 rounded-md border border-blue-200 bg-blue-50/60 px-3 py-2 text-[11px] leading-relaxed text-blue-800">
-                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>Edits are local to this session. Use <strong>Run Test</strong> to test changes, then <strong>Save to Production</strong> to persist.</span>
-              </div>
-              {!hotelOrgId && (
-                <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
-                  <Building2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <span>Choose a hotel above to load its prompts and mailboxes.</span>
-                </div>
-              )}
-              {hasPromptChanges && (
-                <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-800">
-                  <FlaskConical className="h-3.5 w-3.5 shrink-0" />
-                  <span>You have unsaved test changes — these will be used when you run a test.</span>
-                </div>
-              )}
-              {promptsLoading ? (
-                <div className="space-y-3 py-1">
-                  <p className="text-xs text-muted-foreground">Loading prompt configuration…</p>
-                  {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[72px] w-full rounded-lg" />)}
-                </div>
-              ) : (
-                <>
-                  <Accordion type="multiple"  value={openPromptSections} onValueChange={setOpenPromptSections} className="min-w-0 space-y-3 border-none rounded-none">
-                    <PromptEditorField sectionValue="role-objective" label="Role & Objective" value={currentRoleObjective} placeholder="No role & objective yet..." minHeightClass="min-h-[100px]" icon={User} iconWrapperClassName="bg-blue-50" iconClassName="h-4 w-4 text-blue-600" onChange={setRoleObjective} onExpand={() => setExpandedField({ title: 'Role & Objective', value: currentRoleObjective, placeholder: 'No role & objective yet...', onChange: setRoleObjective })} />
-                    <PromptEditorField sectionValue="language-selection" label="Language Selection" value={currentLanguageSelection} placeholder="No language selection yet..." minHeightClass="min-h-[60px]" icon={Languages} iconWrapperClassName="bg-violet-50" iconClassName="h-4 w-4 text-violet-600" onChange={setLanguageSelection} onExpand={() => setExpandedField({ title: 'Language Selection', value: currentLanguageSelection, placeholder: 'No language selection yet...', onChange: setLanguageSelection })} />
-                    <PromptEditorField sectionValue="hotel-policies" label="Hotel Policies" value={currentHotelPolicies} placeholder="No hotel policies yet..." minHeightClass="min-h-[100px]" icon={FileText} iconWrapperClassName="bg-amber-50" iconClassName="h-4 w-4 text-amber-600" onChange={setHotelPolicies} onExpand={() => setExpandedField({ title: 'Hotel Policies', value: currentHotelPolicies, placeholder: 'No hotel policies yet...', onChange: setHotelPolicies })} />
-                    <PromptEditorField sectionValue="learned-style" label="Learned Style" value={currentLearnedStyle} placeholder="No learned style yet..." minHeightClass="min-h-[120px]" icon={Sparkles} iconWrapperClassName="bg-primary/10" iconClassName="h-4 w-4 text-primary" onChange={setLearnedStyle} onExpand={() => setExpandedField({ title: 'Learned Style', value: currentLearnedStyle, placeholder: 'No learned style yet...', onChange: setLearnedStyle })} />
-                    <PromptEditorField sectionValue="special-instructions" label="Special Instructions / Overrides" value={currentOverrides} placeholder="No special instructions yet..." minHeightClass="min-h-[80px]" icon={Settings2} iconWrapperClassName="bg-rose-50" iconClassName="h-4 w-4 text-rose-600" onChange={setOverrides} onExpand={() => setExpandedField({ title: 'Special Instructions / Overrides', value: currentOverrides, placeholder: 'No special instructions yet...', onChange: setOverrides })} />
-                    <PromptEditorField sectionValue="custom-tool-prompt" label="Custom Tool Prompt" value={currentToolPrompt} placeholder="No custom tool prompt yet..." minHeightClass="min-h-[80px]" icon={Settings2} iconWrapperClassName="bg-slate-100" iconClassName="h-4 w-4 text-slate-600" onChange={setCustomToolPrompt} onExpand={() => setExpandedField({ title: 'Custom Tool Prompt', value: currentToolPrompt, placeholder: 'No custom tool prompt yet...', onChange: setCustomToolPrompt })} />
-                  </Accordion>
-                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t">
-                    <Button variant="outline" size="sm" onClick={handleResetPrompts} disabled={!hasPromptChanges}>
-                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" />Discard Changes
-                    </Button>
-                    <Button size="sm" variant={hasPromptChanges ? 'outline' : 'default'} onClick={handleSave} disabled={!hasPromptChanges || !canEditPromptsAndReplay || saveMutation.isPending}>
-                      {saveMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                      <Save className="h-3.5 w-3.5 mr-1.5" />Save to Production
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => {
-                      const parts = [
-                        currentRoleObjective && `## Role & Objective\n${currentRoleObjective}`,
-                        currentLanguageSelection && `## Language Selection\n${currentLanguageSelection}`,
-                        currentHotelPolicies && `## Hotel Policies\n${currentHotelPolicies}`,
-                        currentLearnedStyle && `## Learned Style\n${currentLearnedStyle}`,
-                        currentOverrides && `## Special Instructions / Overrides\n${currentOverrides}`,
-                      ].filter(Boolean).join('\n\n');
-                      navigator.clipboard.writeText(parts);
-                      toast.success('Full prompt copied to clipboard.');
-                    }}>
-                      <Copy className="h-3.5 w-3.5 mr-1.5" />Copy Full Prompt
-                    </Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
+      <div className="grid grid-cols-1  gap-6 items-start">
         {/* Right: Email selector */}
         <div className="space-y-4">
           <Card className="border border-border/60 shadow-sm">
@@ -681,6 +614,74 @@ export default function EmailTrainingCenterPage() {
             </div>
           )}
         </div>
+        {/* Left: Prompt editor */}
+        <div className="min-w-0">
+          <Card className="min-w-0 border border-border/60 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Prompt Configuration</CardTitle>
+              <CardDescription className="text-xs">Organization writing guidelines plus the selected mailbox's learned style, overrides, and custom tool prompt.</CardDescription>
+            </CardHeader>
+            <CardContent className="min-w-0 space-y-5">
+              <div className="flex gap-2 rounded-md border border-blue-200 bg-blue-50/60 px-3 py-2 text-[11px] leading-relaxed text-blue-800">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>Edits are local to this session. Use <strong>Run Test</strong> to test changes, then <strong>Save to Production</strong> to persist.</span>
+              </div>
+              {!hotelOrgId && (
+                <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
+                  <Building2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>Choose a hotel above to load its prompts and mailboxes.</span>
+                </div>
+              )}
+              {hasPromptChanges && (
+                <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-800">
+                  <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+                  <span>You have unsaved test changes — these will be used when you run a test.</span>
+                </div>
+              )}
+              {promptsLoading ? (
+                <div className="space-y-3 py-1">
+                  <p className="text-xs text-muted-foreground">Loading prompt configuration…</p>
+                  {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[72px] w-full rounded-lg" />)}
+                </div>
+              ) : (
+                <>
+                  <Accordion type="multiple" value={openPromptSections} onValueChange={setOpenPromptSections} className="min-w-0 space-y-3 border-none rounded-none">
+                    <PromptEditorField sectionValue="role-objective" label="Role & Objective" value={currentRoleObjective} placeholder="No role & objective yet..." minHeightClass="min-h-[100px]" icon={User} iconWrapperClassName="bg-blue-50" iconClassName="h-4 w-4 text-blue-600" onChange={setRoleObjective} onExpand={() => setExpandedField({ title: 'Role & Objective', value: currentRoleObjective, placeholder: 'No role & objective yet...', onChange: setRoleObjective })} />
+                    <PromptEditorField sectionValue="language-selection" label="Language Selection" value={currentLanguageSelection} placeholder="No language selection yet..." minHeightClass="min-h-[60px]" icon={Languages} iconWrapperClassName="bg-violet-50" iconClassName="h-4 w-4 text-violet-600" onChange={setLanguageSelection} onExpand={() => setExpandedField({ title: 'Language Selection', value: currentLanguageSelection, placeholder: 'No language selection yet...', onChange: setLanguageSelection })} />
+                    <PromptEditorField sectionValue="hotel-policies" label="Hotel Policies" value={currentHotelPolicies} placeholder="No hotel policies yet..." minHeightClass="min-h-[100px]" icon={FileText} iconWrapperClassName="bg-amber-50" iconClassName="h-4 w-4 text-amber-600" onChange={setHotelPolicies} onExpand={() => setExpandedField({ title: 'Hotel Policies', value: currentHotelPolicies, placeholder: 'No hotel policies yet...', onChange: setHotelPolicies })} />
+                    <PromptEditorField sectionValue="learned-style" label="Learned Style" value={currentLearnedStyle} placeholder="No learned style yet..." minHeightClass="min-h-[120px]" icon={Sparkles} iconWrapperClassName="bg-primary/10" iconClassName="h-4 w-4 text-primary" onChange={setLearnedStyle} onExpand={() => setExpandedField({ title: 'Learned Style', value: currentLearnedStyle, placeholder: 'No learned style yet...', onChange: setLearnedStyle })} />
+                    <PromptEditorField sectionValue="special-instructions" label="Special Instructions / Overrides" value={currentOverrides} placeholder="No special instructions yet..." minHeightClass="min-h-[80px]" icon={Settings2} iconWrapperClassName="bg-rose-50" iconClassName="h-4 w-4 text-rose-600" onChange={setOverrides} onExpand={() => setExpandedField({ title: 'Special Instructions / Overrides', value: currentOverrides, placeholder: 'No special instructions yet...', onChange: setOverrides })} />
+                    <PromptEditorField sectionValue="custom-tool-prompt" label="Custom Tool Prompt" value={currentToolPrompt} placeholder="No custom tool prompt yet..." minHeightClass="min-h-[80px]" icon={Settings2} iconWrapperClassName="bg-slate-100" iconClassName="h-4 w-4 text-slate-600" onChange={setCustomToolPrompt} onExpand={() => setExpandedField({ title: 'Custom Tool Prompt', value: currentToolPrompt, placeholder: 'No custom tool prompt yet...', onChange: setCustomToolPrompt })} />
+                  </Accordion>
+                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t">
+                    <Button variant="outline" size="sm" onClick={handleResetPrompts} disabled={!hasPromptChanges}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" />Discard Changes
+                    </Button>
+                    <Button size="sm" variant={hasPromptChanges ? 'outline' : 'default'} onClick={handleSave} disabled={!hasPromptChanges || !canEditPromptsAndReplay || saveMutation.isPending}>
+                      {saveMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                      <Save className="h-3.5 w-3.5 mr-1.5" />Save to Production
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const parts = [
+                        currentRoleObjective && `## Role & Objective\n${currentRoleObjective}`,
+                        currentLanguageSelection && `## Language Selection\n${currentLanguageSelection}`,
+                        currentHotelPolicies && `## Hotel Policies\n${currentHotelPolicies}`,
+                        currentLearnedStyle && `## Learned Style\n${currentLearnedStyle}`,
+                        currentOverrides && `## Special Instructions / Overrides\n${currentOverrides}`,
+                      ].filter(Boolean).join('\n\n');
+                      navigator.clipboard.writeText(parts);
+                      toast.success('Full prompt copied to clipboard.');
+                    }}>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />Copy Full Prompt
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+
       </div>
 
       {/* Filter sheet */}
