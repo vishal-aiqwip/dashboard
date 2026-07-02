@@ -28,6 +28,7 @@ const ReportAssessmentsChainsAndHotels = lazy(() => import('@/pages/report-asses
 const ReportAssessmentsBenchmarks = lazy(() => import('@/pages/report-assessments/benchmarks'));
 const ReportAssessmentsReports = lazy(() => import('@/pages/report-assessments/reports'));
 const ReportAssessmentsReportDetail = lazy(() => import('@/pages/report-assessments/report-detail'));
+const PublicReportPage = lazy(() => import('@/pages/report-assessments/public-report'));
 
 function LazyPage({ children }: { children: React.ReactNode }) {
   return (
@@ -52,6 +53,14 @@ const router = createBrowserRouter([
           <AuthPage />
         </LazyPage>
       </GuestRoute>
+    ),
+  },
+  {
+    path: '/email-reports/public',
+    element: (
+      <LazyPage>
+        <PublicReportPage />
+      </LazyPage>
     ),
   },
   {

@@ -19,7 +19,7 @@ export default function BenchmarksPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-6 space-y-6 w-full">
       <div className="space-y-1">
         <h2 className="text-h6 font-semibold tracking-tight text-grey-900">Benchmarks</h2>
         <p className="text-small leading-relaxed text-grey-700">
@@ -28,7 +28,7 @@ export default function BenchmarksPage() {
       </div>
 
       <Card className="border border-grey-100 bg-white shadow-sm">
-        <CardContent className="px-6 py-10 text-left">
+        <CardContent className="">
           <p className="text-small font-medium text-grey-900 mb-1">Coming soon</p>
           <p className="text-xs text-grey-600">
             Benchmark data visualizations are being migrated to this view.

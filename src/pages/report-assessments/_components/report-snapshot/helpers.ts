@@ -29,6 +29,11 @@ export function isRevenueFindings(x: unknown): x is RevenueFinding[] {
   );
 }
 
+export const CHART_COLORS = {
+  primary: 'var(--chart-2)',
+  primaryMuted: 'var(--chart-2)',
+} as const;
+
 export const EMAIL_REPORT_WEEKDAY_ORDER = [
   'Monday',
   'Tuesday',

@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios';
-import { axiosApi } from '@/lib/axios';
+import { axiosApi, publicAxios } from '@/lib/axios';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -395,6 +395,21 @@ export const reportAssessmentsService = {
       return unwrap<EmailReportRow & { report_json?: Record<string, unknown> | null }>(data);
     } catch (e) {
       throw apiErr(e, 'Failed to fetch report snapshot');
+    }
+  },
+
+  getPublicReport: async (params: {
+    v: string;
+    rid: string;
+    hid: string;
+    at: string;
+    sig: string;
+  }): Promise<EmailReportRow & { report_json?: Record<string, unknown> | null }> => {
+    try {
+      const { data } = await publicAxios.get<unknown>('/api/email-reports/public', { params });
+      return unwrap<EmailReportRow & { report_json?: Record<string, unknown> | null }>(data);
+    } catch (e) {
+      throw apiErr(e, 'Failed to load public report');
     }
   },
 

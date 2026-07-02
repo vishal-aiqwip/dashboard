@@ -55,7 +55,7 @@ export function EmailReportSnapshotView({
       <FlagshipKpis headlineKpi={rj.headline_kpi} rev={rev} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-        <TabsList className="flex w-full flex-wrap gap-1.5 h-auto rounded-xl border bg-muted/60 p-1.5">
+        <TabsList variant={"accent-tab"} className="w-full">
           {TABS.map((tab) => (
             <TabsTrigger
               key={tab.value}

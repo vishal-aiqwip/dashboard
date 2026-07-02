@@ -1,17 +1,15 @@
 import { Fragment, useMemo } from 'react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChevronRight } from 'lucide-react';
 
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import {
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 
 import {
@@ -20,6 +18,7 @@ import {
   heatmapColor,
   formatHeatmapTitle,
 } from './helpers';
+import { ChartCard } from './chart-card';
 import { SectionHeader } from './section-header';
 import type { HourlyResponseDataRow, ServicePerformance, SpotlightComment, WorkloadProfile } from './types';
 
@@ -29,6 +28,27 @@ const spotlightStyles: Record<string, string> = {
   coaching: 'border-violet-300 bg-violet-50 text-violet-800',
   insight: 'border-sky-300 bg-sky-50 text-sky-900',
 };
+
+function responseTimeTooltipFormatter(
+  value: number | string | Array<number | string>,
+  name: string,
+  item: { dataKey?: string | number },
+) {
+  return (
+    <>
+      <div
+        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+        style={{ backgroundColor: `var(--color-${item.dataKey})` }}
+      />
+      <div className="flex flex-1 items-center justify-between leading-none">
+        <span className="text-muted-foreground">{name}</span>
+        <span className="text-foreground font-mono font-medium tabular-nums">
+          {formatHours(Number(value))}
+        </span>
+      </div>
+    </>
+  );
+}
 
 interface ExecutiveTabProps {
   spotlightComments: SpotlightComment[];
@@ -90,6 +110,15 @@ export function ExecutiveTab({
     count: hourCountMap.get(h) ?? 0,
   }));
 
+  const volumeChartConfig = {
+    count: { label: 'Messages', color: 'var(--chart-2)' },
+  } satisfies ChartConfig;
+
+  const responseTimeChartConfig = {
+    median: { label: 'Median', color: 'var(--chart-2)' },
+    p90: { label: 'p90', color: 'var(--chart-2)' },
+  } satisfies ChartConfig;
+
   const responseHeatmapModel = useMemo(() => {
     const rows = hourlyResponseData;
     if (!rows?.length) return null;
@@ -138,194 +167,96 @@ export function ExecutiveTab({
           {spotlightComments.map((comment, si) => (
             <Card
               key={`${comment.headline}-${si}`}
-              className="rounded-xl border border-grey-100 bg-white shadow-sm"
+              className=""
             >
-              <div className="p-4">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span
-                    className={cn(
-                      'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
-                      spotlightStyles[comment.type] ??
+              <CardContent>
+
+                <div className="">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+                        spotlightStyles[comment.type] ??
                         'border-slate-300 bg-slate-100 text-slate-800',
-                    )}
-                  >
-                    {comment.type}
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-grey-400" />
+                      )}
+                    >
+                      {comment.type}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-grey-400" />
+                  </div>
+                  <p className="text-sm font-semibold text-grey-900">{comment.headline}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-grey-600">{comment.detail}</p>
                 </div>
-                <p className="text-sm font-semibold text-grey-900">{comment.headline}</p>
-                <p className="mt-1 text-xs leading-relaxed text-grey-600">{comment.detail}</p>
-              </div>
+              </CardContent>
             </Card>
           ))}
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="rounded-2xl border-grey-100 shadow-sm">
-          <CardHeader className="pb-2">
-            <SectionHeader
-              title="Volume by day"
-              description="All weekdays — zero when no messages on that day."
-            />
-          </CardHeader>
-          <CardContent className="h-80 px-4 pb-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={volumeByDay} margin={{ top: 8, right: 8, left: 8, bottom: 48 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 11 }}
-                  angle={-35}
-                  textAnchor="end"
-                  height={50}
-                  interval={0}
-                />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="hsl(var(--primary))" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <ChartCard
+          title="Volume by day"
+          description="All weekdays — zero when no messages on that day."
+          config={volumeChartConfig}
+        >
+          <BarChart data={volumeByDay} margin={{ top: 8, right: 8, left: 8, bottom: 48 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="day" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" height={50} interval={0} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="var(--color-count)" />
+          </BarChart>
+        </ChartCard>
 
-        <Card className="rounded-2xl border-grey-100 shadow-sm">
-          <CardHeader className="pb-2">
-            <SectionHeader
-              title="Volume by hour"
-              description="Full 24-hour clock — zero for hours with no messages."
-            />
-          </CardHeader>
-          <CardContent className="h-80 px-4 pb-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={volumeByHourFull}
-                margin={{ top: 8, right: 8, left: 8, bottom: 48 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="hourLabel"
-                  tick={{ fontSize: 9 }}
-                  angle={-65}
-                  textAnchor="end"
-                  height={50}
-                  interval={0}
-                />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="count" radius={[2, 2, 0, 0]} fill="hsl(var(--primary))" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <ChartCard
+          title="Volume by hour"
+          description="Full 24-hour clock — zero for hours with no messages."
+          config={volumeChartConfig}
+        >
+          <BarChart data={volumeByHourFull} margin={{ top: 8, right: 8, left: 8, bottom: 48 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="hourLabel" tick={{ fontSize: 9 }} angle={-65} textAnchor="end" height={50} interval={0} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Bar dataKey="count" radius={[2, 2, 0, 0]} fill="var(--color-count)" />
+          </BarChart>
+        </ChartCard>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="rounded-2xl border-grey-100 shadow-sm">
-          <CardHeader className="pb-2">
-            <SectionHeader
-              title="Response time by weekday"
-              description="Median and p90 reply time (minutes) by day."
-            />
-          </CardHeader>
-          <CardContent className="h-80 px-4 pb-4">
-            {responseTimeByWeekdayChart.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={responseTimeByWeekdayChart}
-                  margin={{ top: 8, right: 8, left: 8, bottom: 48 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="day"
-                    tick={{ fontSize: 11 }}
-                    angle={-35}
-                    textAnchor="end"
-                    height={50}
-                    interval={0}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => formatHours(v as number)}
-                  />
-                  <Tooltip
-                    formatter={(value: number, name: string) => [formatHours(value), name]}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="median"
-                    name="Median"
-                    fill="hsl(221 83% 53%)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="p90"
-                    name="p90"
-                    fill="hsl(142 71% 45%)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Not available for this report
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ChartCard
+          title="Response time by weekday"
+          description="Median and p90 reply time (minutes) by day."
+          config={responseTimeChartConfig}
+          hasData={responseTimeByWeekdayChart.length > 0}
+        >
+          <BarChart data={responseTimeByWeekdayChart} margin={{ top: 8, right: 8, left: 8, bottom: 48 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="day" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" height={50} interval={0} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatHours(v as number)} />
+            <ChartTooltip content={<ChartTooltipContent formatter={responseTimeTooltipFormatter} />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Bar dataKey="median" name="Median" fill="var(--color-median)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="p90" name="p90" fill="var(--color-p90)" fillOpacity={0.4} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ChartCard>
 
-        <Card className="rounded-2xl border-grey-100 shadow-sm">
-          <CardHeader className="pb-2">
-            <SectionHeader
-              title="Response time by hour"
-              description="Median and p90 reply time across each hour (0–23)."
-            />
-          </CardHeader>
-          <CardContent className="h-80 px-4 pb-4">
-            {responseTimeByHourChart.some((r) => r.inbound > 0) ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={responseTimeByHourChart}
-                  margin={{ top: 8, right: 8, left: 8, bottom: 48 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="hourLabel"
-                    tick={{ fontSize: 9 }}
-                    angle={-65}
-                    textAnchor="end"
-                    height={50}
-                    interval={0}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => formatHours(v as number)}
-                  />
-                  <Tooltip
-                    formatter={(value: number, name: string) => [formatHours(value), name]}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="median"
-                    name="Median"
-                    fill="hsl(221 83% 53%)"
-                    radius={[2, 2, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="p90"
-                    name="p90"
-                    fill="hsl(142 71% 45%)"
-                    radius={[2, 2, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Not available for this report
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ChartCard
+          title="Response time by hour"
+          description="Median and p90 reply time across each hour (0–23)."
+          config={responseTimeChartConfig}
+          hasData={responseTimeByHourChart.some((r) => r.inbound > 0)}
+        >
+          <BarChart data={responseTimeByHourChart} margin={{ top: 8, right: 8, left: 8, bottom: 48 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="hourLabel" tick={{ fontSize: 9 }} angle={-65} textAnchor="end" height={50} interval={0} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatHours(v as number)} />
+            <ChartTooltip content={<ChartTooltipContent formatter={responseTimeTooltipFormatter} />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Bar dataKey="median" name="Median" fill="var(--color-median)" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="p90" name="p90" fill="var(--color-p90)" fillOpacity={0.4} radius={[2, 2, 0, 0]} />
+          </BarChart>
+        </ChartCard>
       </div>
 
       {responseHeatmapModel && (

@@ -51,9 +51,9 @@ export function FlagshipKpis({ headlineKpi: hk, rev }: FlagshipKpisProps) {
   ];
 
   return (
-    <div className="mb-6 overflow-hidden rounded-2xl border border-emerald-200/60 bg-emerald-50/30 p-6 shadow-sm">
+    <div className="mb-6 overflow-hidden rounded-2xl border border-primary/60 bg-primary/10 p-6 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Badge className="rounded-full bg-emerald-700 px-3 py-1 text-white">
+        <Badge className="">
           Flagship metrics
         </Badge>
         <span className="text-sm text-muted-foreground">

@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { type ColumnDef } from '@tanstack/react-table';
-import { ArrowLeft, Eye, FileDown, FileJson, FileText, Link2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Eye, FileDown, FileJson, FileText, Link2, Loader2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 

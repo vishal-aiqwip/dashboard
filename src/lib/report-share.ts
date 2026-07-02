@@ -1,4 +1,4 @@
-const REPORT_SHARE_FORMAT_VERSION = '1' as const;
+const REPORT_SHARE_FORMAT_VERSION = 'v1' as const;
 
 export function reportRowTimestampForPublicLink(
   generatedAt: string | null | undefined,
