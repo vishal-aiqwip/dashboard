@@ -57,7 +57,17 @@ export const NAV_SECTIONS: NavSectionConfig[] = [
       { title: 'Onboarding', url: '/dashboard/onboarding', icon: IconDeviceDesktop },
       { title: 'Email Performance', url: '/dashboard/email-performance', icon: IconChartBar },
       { title: 'Email Training Center', url: '/dashboard/email-training-center', icon: IconFlask },
-      { title: 'Report Assessments', url: '/dashboard/report-assessments', icon: IconClipboardCheck },
+      {
+        title: 'Report Assessments',
+        url: '/dashboard/report-assessments',
+        icon: IconClipboardCheck,
+        children: [
+          { title: 'Firm', url: '/dashboard/report-assessments/firm', icon: IconUsers },
+          { title: 'Chains & Hotels', url: '/dashboard/report-assessments/chains-and-hotels', icon: IconBuildingSkyscraper },
+          { title: 'Benchmarks', url: '/dashboard/report-assessments/benchmarks', icon: IconChartBar },
+          { title: 'Reports', url: '/dashboard/report-assessments/reports', icon: IconReport },
+        ],
+      },
     ],
   },
   {

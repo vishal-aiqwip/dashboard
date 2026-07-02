@@ -21,6 +21,14 @@ const SecurityPage = lazy(() => import('@/pages/manage-hotels/security'));
 const ChatbotTestPage = lazy(() => import('@/pages/chatbot-test'));
 const EmailTrainingCenterPage = lazy(() => import('@/pages/email-training-center'));
 
+const ReportAssessmentsLayout = lazy(() => import('@/pages/report-assessments/layout'));
+const ReportAssessmentsIndex = lazy(() => import('@/pages/report-assessments/index'));
+const ReportAssessmentsFirm = lazy(() => import('@/pages/report-assessments/firm'));
+const ReportAssessmentsChainsAndHotels = lazy(() => import('@/pages/report-assessments/chains-and-hotels'));
+const ReportAssessmentsBenchmarks = lazy(() => import('@/pages/report-assessments/benchmarks'));
+const ReportAssessmentsReports = lazy(() => import('@/pages/report-assessments/reports'));
+const ReportAssessmentsReportDetail = lazy(() => import('@/pages/report-assessments/report-detail'));
+
 function LazyPage({ children }: { children: React.ReactNode }) {
   return (
     <Suspense
@@ -160,6 +168,64 @@ const router = createBrowserRouter([
                 <HotelUsersPage />
               </LazyPage>
             ),
+          },
+          {
+            path: 'report-assessments',
+            element: (
+              <LazyPage>
+                <ReportAssessmentsLayout />
+              </LazyPage>
+            ),
+            children: [
+              {
+                index: true,
+                element: (
+                  <LazyPage>
+                    <ReportAssessmentsIndex />
+                  </LazyPage>
+                ),
+              },
+              {
+                path: 'firm',
+                element: (
+                  <LazyPage>
+                    <ReportAssessmentsFirm />
+                  </LazyPage>
+                ),
+              },
+              {
+                path: 'chains-and-hotels',
+                element: (
+                  <LazyPage>
+                    <ReportAssessmentsChainsAndHotels />
+                  </LazyPage>
+                ),
+              },
+              {
+                path: 'benchmarks',
+                element: (
+                  <LazyPage>
+                    <ReportAssessmentsBenchmarks />
+                  </LazyPage>
+                ),
+              },
+              {
+                path: 'reports',
+                element: (
+                  <LazyPage>
+                    <ReportAssessmentsReports />
+                  </LazyPage>
+                ),
+              },
+              {
+                path: 'report-detail',
+                element: (
+                  <LazyPage>
+                    <ReportAssessmentsReportDetail />
+                  </LazyPage>
+                ),
+              },
+            ],
           },
         ],
       },

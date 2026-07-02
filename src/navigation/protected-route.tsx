@@ -12,18 +12,34 @@ export default function ProtectedRoute() {
 
   useEffect(() => {
     if (currentUser) {
-      dispatch(
-        login({
-          user: {
-            uid: currentUser.uid,
-            email: currentUser.email,
-            displayName: currentUser.displayName,
-            emailVerified: currentUser.emailVerified,
-          },
-          role: null,
-          permissions: [],
-        })
-      );
+      currentUser.getIdTokenResult().then((result) => {
+        const globalRole = result.claims.global_role as 'admin' | 'user' | null | undefined;
+        dispatch(
+          login({
+            user: {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              emailVerified: currentUser.emailVerified,
+            },
+            role: globalRole ?? null,
+            permissions: [],
+          })
+        );
+      }).catch(() => {
+        dispatch(
+          login({
+            user: {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              emailVerified: currentUser.emailVerified,
+            },
+            role: null,
+            permissions: [],
+          })
+        );
+      });
     } else if (!loading) {
       dispatch(logout());
     }
