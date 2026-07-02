@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -379,14 +380,10 @@ export function UnansweredTab({ kbId, orgId }: UnansweredTabProps) {
                   onClick={() => toggleExpand(id)}
                 >
                   <div className="flex items-start gap-3 pr-4">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 h-4 w-4 accent-grey-900"
+                    <Checkbox
+                      className="mt-0.5"
                       checked={selectedIds.has(id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        toggleSelect(id);
-                      }}
+                      onCheckedChange={() => toggleSelect(id)}
                       onClick={(e) => e.stopPropagation()}
                     />
                     <p className="text-sm text-grey-900">

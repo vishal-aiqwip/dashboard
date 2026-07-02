@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { keepPreviousData } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import {
+  CalendarIcon,
   ChevronDown,
   ChevronUp,
+  Languages,
   Loader2,
   MessagesSquare,
+  MoreVertical,
+  RefreshCw,
   Search,
   StickyNote,
   ThumbsDown,
@@ -16,8 +22,15 @@ import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -57,9 +70,13 @@ function channelBadge(channel: ChatConversation['channel']) {
 function ConversationCard({
   conv,
   chatbotId,
+  translate = false,
+  onRerun,
 }: {
   conv: ChatConversation;
   chatbotId: string;
+  translate?: boolean;
+  onRerun?: (conv: ChatConversation) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
@@ -81,6 +98,12 @@ function ConversationCard({
     onError: () => toast.error('Failed to save note'),
   });
 
+  const openAddNote = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded(true);
+    setEditingNote(true);
+  };
+
   // Preview: first human message, fallback to first message
   const firstHuman = conv.messages?.find((m) => m.sender === 'human');
   const preview =
@@ -92,10 +115,10 @@ function ConversationCard({
     conv.messages?.filter((m) => m.feedback?.rating === 'negative').length ?? 0;
 
   return (
-    <div className="rounded-xl border border-grey-100 bg-muted/30">
+    <div className="relative rounded-xl border border-grey-100 bg-muted/30">
       <button
         type="button"
-        className="flex w-full items-start gap-3 p-4 text-left"
+        className="flex w-full items-start gap-3 p-4  text-left"
         onClick={() => setExpanded((v) => !v)}
       >
         <div className="shrink-0 rounded-lg bg-primary/10 p-2 text-primary">
@@ -141,24 +164,59 @@ function ConversationCard({
             )}
           </div>
         </div>
-        <div className="shrink-0 text-muted-foreground">
+        <div className="shrink-0 text-muted-foreground ">
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+
+        </div>
+        <div className="">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                onClick={(e) => { e.stopPropagation(); onRerun?.(conv); }}
+              >
+                <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                Re-run conversation
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={openAddNote}>
+                <StickyNote className="mr-2 h-3.5 w-3.5" />
+                Add note
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </button>
 
+      {/* Three-dots menu — outside the expand button so clicks don't toggle */}
+
+
       {expanded && (
         <div className="space-y-2.5 border-t border-grey-100 px-4 pb-4 pt-3">
+          {translate && (
+            <div className="flex items-center gap-1.5 rounded-lg bg-sky-50 px-2.5 py-1.5 text-[11px] text-sky-700">
+              <Languages className="h-3 w-3 shrink-0" />
+              Translation active — messages shown in English
+            </div>
+          )}
           {/* Messages */}
           {(conv.messages ?? []).map((msg, idx) => {
             const isHuman = msg.sender === 'human';
             return (
               <div
                 key={idx}
-                className={`rounded-lg p-3 text-xs ${
-                  isHuman
+                className={`rounded-lg p-3 text-xs ${isHuman
                     ? 'ml-6 bg-primary/10 text-grey-900'
                     : 'mr-6 border border-grey-100 bg-background text-grey-700'
-                }`}
+                  }`}
               >
                 <div className="mb-1 flex items-center justify-between">
                   <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -262,10 +320,69 @@ function ConversationCard({
 export function ChatLogsTab({ chatbotId, orgId }: ChatLogsTabProps) {
   const [search, setSearch] = useState('');
   const [channel, setChannel] = useState<'all' | 'web' | 'messenger' | 'instagram'>('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [dateOpen, setDateOpen] = useState(false);
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
   const [limit, setLimit] = useState(20);
+  const [translate, setTranslate] = useState(false);
+
+  const handleRerun = async (conv: ChatConversation) => {
+    const userTurns = (conv.messages ?? [])
+      .filter((m) => (m.sender === 'human' || m.sender === 'user') && m.message_content?.trim())
+      .sort((a, b) => {
+        const ta = new Date((a as any).timestamp || (a as any).created_at || 0).getTime();
+        const tb = new Date((b as any).timestamp || (b as any).created_at || 0).getTime();
+        return ta - tb;
+      })
+      .map((m) => String(m.message_content));
+
+    if (userTurns.length === 0) {
+      toast.info('No user messages to replay.');
+      return;
+    }
+
+    const iframe = document.querySelector<HTMLIFrameElement>('iframe[title="Chatbot Preview"]');
+    if (!iframe?.contentWindow) {
+      toast.info('Open the Live Preview to replay this conversation.');
+      return;
+    }
+
+    const win = iframe.contentWindow;
+
+    // Wait for the bot to finish responding to one question
+    const waitForStep = (timeoutMs = 45_000) =>
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, timeoutMs);
+        const onMsg = (e: MessageEvent) => {
+          const t = (e.data as any)?.type as string | undefined;
+          if (
+            t === 'CHATBOT:RESPONSE_COMPLETE' ||
+            t === 'CHATBOT:RESPONSE_FINAL' ||
+            t === 'final' ||
+            t === 'CHATBOT:ERROR'
+          ) {
+            clearTimeout(timer);
+            window.removeEventListener('message', onMsg);
+            resolve();
+          }
+        };
+        window.addEventListener('message', onMsg);
+      });
+
+    toast.success(`Replaying ${userTurns.length} message${userTurns.length > 1 ? 's' : ''}…`);
+
+    win.postMessage({ type: 'CLEAR_CHAT_HISTORY' }, '*');
+    await new Promise((r) => setTimeout(r, 150));
+
+    for (const question of userTurns) {
+      win.postMessage({ type: 'ASK_QUESTION', payload: { question } }, '*');
+      await waitForStep();
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  };
+
+  const fromDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+  const toDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
 
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ['chat-logs', chatbotId, orgId, fromDate, toDate, limit],
@@ -310,10 +427,24 @@ export function ChatLogsTab({ chatbotId, orgId }: ChatLogsTabProps) {
 
   return (
     <div className="space-y-5">
+      {/* ── Top bar ────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-grey-900">Chat Logs</p>
+        <Button
+          size="sm"
+          variant={translate ? 'default' : 'outline'}
+          className="h-7 gap-1.5 text-xs"
+          onClick={() => setTranslate((v) => !v)}
+        >
+          <Languages className="h-3.5 w-3.5" />
+          Translate
+        </Button>
+      </div>
+
       {/* ── Controls ───────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex items-center gap-2">
         {/* Search */}
-        <div className="relative min-w-48 flex-1">
+        <div className="relative min-w-40 flex-1">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search messages…"
@@ -332,73 +463,74 @@ export function ChatLogsTab({ chatbotId, orgId }: ChatLogsTabProps) {
           )}
         </div>
 
+        {/* Date range popover */}
+        <Popover open={dateOpen} onOpenChange={setDateOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-8 gap-1.5 border-grey-100 text-xs font-normal ${dateRange?.from ? 'text-grey-900' : 'text-muted-foreground'}`}
+            >
+              <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
+              {dateRange?.from ? (
+                dateRange.to ? (
+                  `${format(dateRange.from, 'dd MMM')} – ${format(dateRange.to, 'dd MMM yyyy')}`
+                ) : (
+                  format(dateRange.from, 'dd MMM yyyy')
+                )
+              ) : (
+                'Pick a date'
+              )}
+              {dateRange?.from && (
+                <span
+                  role="button"
+                  className="ml-1 rounded-sm text-muted-foreground hover:text-grey-800"
+                  onClick={(e) => { e.stopPropagation(); setDateRange(undefined); }}
+                >
+                  <X className="h-3 w-3" />
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="range"
+              selected={dateRange}
+              onSelect={(r) => { setDateRange(r); if (r?.from && r?.to) setDateOpen(false); }}
+              initialFocus
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
+
         {/* Channel */}
-        <div className="space-y-1">
-          <Label className="text-[10px] text-muted-foreground">Channel</Label>
-          <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
-            <SelectTrigger className="h-8 w-36 border-grey-100 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All channels</SelectItem>
-              <SelectItem value="web">Web</SelectItem>
-              <SelectItem value="messenger">Messenger</SelectItem>
-              <SelectItem value="instagram">Instagram</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
+          <SelectTrigger className="h-8 w-32 shrink-0 border-grey-100 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All channels</SelectItem>
+            <SelectItem value="web">Web</SelectItem>
+            <SelectItem value="messenger">Messenger</SelectItem>
+            <SelectItem value="instagram">Instagram</SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* Sort */}
-        <div className="space-y-1">
-          <Label className="text-[10px] text-muted-foreground">Sort</Label>
-          <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
-            <SelectTrigger className="h-8 w-32 border-grey-100 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Newest first</SelectItem>
-              <SelectItem value="oldest">Oldest first</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Date range */}
-        <div className="space-y-1">
-          <Label className="text-[10px] text-muted-foreground">From</Label>
-          <Input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="h-8 border-grey-100 text-xs"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-[10px] text-muted-foreground">To</Label>
-          <Input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="h-8 border-grey-100 text-xs"
-          />
-        </div>
-        {(fromDate || toDate) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 text-xs"
-            onClick={() => {
-              setFromDate('');
-              setToDate('');
-            }}
-          >
-            Clear dates
-          </Button>
-        )}
+        <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
+          <SelectTrigger className="h-8 w-30 shrink-0 border-grey-100 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Most Recent</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* ── Stats row ──────────────────────────────────────────────────────── */}
       {allConvs.length > 0 && (
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-grey-100 bg-muted/20 px-4 py-2.5">
+        <div className="flex  flex-wrap items-center gap-4 rounded-xl border border-grey-100 bg-muted/20 px-4 py-2.5">
           <span className="text-xs text-muted-foreground">
             <span className="font-semibold text-grey-800">{allConvs.length}</span> conversations
             {hasMore && ' (more available)'}
@@ -433,7 +565,7 @@ export function ChatLogsTab({ chatbotId, orgId }: ChatLogsTabProps) {
 
       {/* ── Empty state ────────────────────────────────────────────────────── */}
       {!isLoading && !isError && filtered.length === 0 && (
-        <div className="rounded-xl border border-dashed border-grey-100 py-16 text-center">
+        <div className="rounded-xl  border border-dashed border-grey-100 py-16 text-center">
           <MessagesSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
           <p className="text-sm font-medium text-grey-900">No conversations</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -450,7 +582,13 @@ export function ChatLogsTab({ chatbotId, orgId }: ChatLogsTabProps) {
       {!isLoading && filtered.length > 0 && (
         <div className="space-y-3">
           {filtered.map((conv) => (
-            <ConversationCard key={conv.id} conv={conv} chatbotId={chatbotId} />
+            <ConversationCard
+              key={conv.id}
+              conv={conv}
+              chatbotId={chatbotId}
+              translate={translate}
+              onRerun={handleRerun}
+            />
           ))}
 
           {/* Load more */}
