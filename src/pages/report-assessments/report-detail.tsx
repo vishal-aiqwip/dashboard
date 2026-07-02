@@ -1,10 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { ArrowLeft, FileDown, FileJson, Link2, Loader2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  buildPublicEmailReportUrl,
+  getPublicAppOrigin,
+  reportRowTimestampForPublicLink,
+} from '@/lib/report-share';
 import { reportAssessmentsService } from '@/services/reportAssessments/reportAssessments';
 import {
   EmailReportSnapshotView,
@@ -37,6 +44,7 @@ export default function ReportDetailPage() {
   const [params] = useSearchParams();
   const reportId = params.get('report_id') ?? '';
   const hotelId = params.get('hotel_id') ?? '';
+  const [downloadBusy, setDownloadBusy] = useState<'json' | 'pdf' | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['emailReports', 'snapshot', reportId, hotelId],
@@ -44,15 +52,60 @@ export default function ReportDetailPage() {
     enabled: Boolean(reportId && hotelId),
   });
 
+  const publicLinkMutation = useMutation({
+    mutationFn: (p: { report_id: string; hotel_id: string; generated_at: string }) =>
+      reportAssessmentsService.createPublicLink(p),
+  });
+
+  const generatedAtForPublicLink = data
+    ? reportRowTimestampForPublicLink(data.generated_at, data.created_at)
+    : null;
+
   const handleDownloadJSON = () => {
     if (!data) return;
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `report-${reportId}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    setDownloadBusy('json');
+    try {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report-${reportId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadBusy(null);
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    setDownloadBusy('pdf');
+    window.print();
+    setDownloadBusy(null);
+  };
+
+  const handleCopyPublicLink = async () => {
+    if (!generatedAtForPublicLink || !data) return;
+    try {
+      const { signature } = await publicLinkMutation.mutateAsync({
+        report_id: data.report_id,
+        hotel_id: data.hotel_id,
+        generated_at: generatedAtForPublicLink,
+      });
+      const origin = getPublicAppOrigin();
+      if (!origin) {
+        toast.error('Could not determine the app URL for this link.');
+        return;
+      }
+      const url = buildPublicEmailReportUrl(
+        origin,
+        { report_id: data.report_id, hotel_id: data.hotel_id, generated_at: generatedAtForPublicLink },
+        signature,
+      );
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copied — recipients can open this without signing in.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create a public link.');
+    }
   };
 
   const snapshot: EmailReportSnapshot | null =
@@ -68,7 +121,7 @@ export default function ReportDetailPage() {
       : null;
 
   return (
-    <div className="p-6 w-full max-w-5xl space-y-6">
+    <div className="p-6 w-full space-y-6 ">
       <div className="flex items-center justify-between gap-3">
         <Button
           variant="ghost"
@@ -80,15 +133,59 @@ export default function ReportDetailPage() {
           Back to Reports
         </Button>
         {data && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 rounded-lg shrink-0"
-            onClick={handleDownloadJSON}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download JSON
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-lg gap-2"
+              disabled={
+                downloadBusy !== null ||
+                publicLinkMutation.isPending ||
+                generatedAtForPublicLink == null
+              }
+              title={
+                generatedAtForPublicLink == null
+                  ? 'This report has no timestamp — public link is unavailable.'
+                  : 'Copy a link anyone can use without signing in'
+              }
+              onClick={() => void handleCopyPublicLink()}
+            >
+              {publicLinkMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Link2 className="h-4 w-4" />
+              )}
+              Copy link
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-lg gap-2"
+              disabled={downloadBusy !== null}
+              onClick={handleDownloadJSON}
+            >
+              {downloadBusy === 'json' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileJson className="h-4 w-4" />
+              )}
+              JSON
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-lg gap-2"
+              disabled={downloadBusy !== null}
+              onClick={handleDownloadPdf}
+            >
+              {downloadBusy === 'pdf' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="h-4 w-4" />
+              )}
+              PDF
+            </Button>
+          </div>
         )}
       </div>
 

@@ -397,4 +397,18 @@ export const reportAssessmentsService = {
       throw apiErr(e, 'Failed to fetch report snapshot');
     }
   },
+
+  createPublicLink: async (params: {
+    report_id: string;
+    hotel_id: string;
+    generated_at: string;
+  }): Promise<{ signature: string }> => {
+    try {
+      const { data } = await axiosApi.post<unknown>('/api/email-reports/public-link', params);
+      const payload = unwrap<{ signature: string }>(data);
+      return { signature: payload.signature };
+    } catch (e) {
+      throw apiErr(e, 'Failed to create public link');
+    }
+  },
 };
