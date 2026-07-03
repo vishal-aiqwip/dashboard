@@ -49,7 +49,7 @@ export default function DashboardLayout() {
       />
       <SidebarInset>
         <SiteHeader />
-        <div className="@container/main flex flex-1 flex-col gap-4  md:gap-6 ">
+        <div className="@container/main flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto md:gap-6">
           <Outlet />
         </div>
       </SidebarInset>

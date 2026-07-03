@@ -38,9 +38,116 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { ChatConversation } from '@/services/chatbotTrainingCenter/chatbotTrainingCenter';
 import { chatbotTrainingCenterService } from '@/services/chatbotTrainingCenter/chatbotTrainingCenter';
+
+// ── Language options ───────────────────────────────────────────────────────────
+
+const LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'no', label: 'Norwegian' },
+  { value: 'sv', label: 'Swedish' },
+  { value: 'da', label: 'Danish' },
+  { value: 'fi', label: 'Finnish' },
+  { value: 'de', label: 'German' },
+  { value: 'fr', label: 'French' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'it', label: 'Italian' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'nl', label: 'Dutch' },
+  { value: 'pl', label: 'Polish' },
+  { value: 'ru', label: 'Russian' },
+  { value: 'ar', label: 'Arabic' },
+  { value: 'zh', label: 'Chinese (Simplified)' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'ko', label: 'Korean' },
+];
+
+// ── Google Translate (free unofficial endpoint) ────────────────────────────────
+
+async function googleTranslate(text: string, targetLang: string): Promise<string> {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Translation failed');
+  const json = await res.json();
+  return (json[0] as [string, unknown][]).map(([t]) => t).join('');
+}
+
+// ── TranslatedText ─────────────────────────────────────────────────────────────
+
+function TranslatedText({
+  text,
+  enabled,
+  targetLanguage,
+}: {
+  text: string;
+  enabled: boolean;
+  targetLanguage: string;
+}) {
+  const { data: translated, isPending } = useQuery({
+    queryKey: ['translate', text, targetLanguage],
+    queryFn: () => googleTranslate(text, targetLanguage),
+    enabled: enabled && !!text,
+    staleTime: Infinity,
+    retry: false,
+  });
+
+  if (!enabled) return <>{text}</>;
+  if (isPending) return <span className="text-muted-foreground/60">Translating…</span>;
+  return <>{translated ?? text}</>;
+}
+
+// ── TranslateButton (popover) ─────────────────────────────────────────────────
+
+function TranslateButton({
+  enabled,
+  onToggle,
+  targetLanguage,
+  onLanguageChange,
+}: {
+  enabled: boolean;
+  onToggle: (v: boolean) => void;
+  targetLanguage: string;
+  onLanguageChange: (v: string) => void;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          size="sm"
+          variant={enabled ? 'default' : 'outline'}
+          className="h-7 gap-1.5 text-xs"
+        >
+          <Languages className="h-3.5 w-3.5" />
+          {enabled ? 'Translate On' : 'Translate'}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 space-y-3 p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Translate</p>
+          <Switch checked={enabled} onCheckedChange={onToggle} />
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Target language</p>
+          <Select value={targetLanguage} onValueChange={onLanguageChange}>
+            <SelectTrigger className="h-8 border-grey-100 text-sm">
+              <SelectValue placeholder="Language" />
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface ChatLogsTabProps {
   chatbotId: string;
@@ -70,12 +177,14 @@ function channelBadge(channel: ChatConversation['channel']) {
 function ConversationCard({
   conv,
   chatbotId,
-  translate = false,
+  translateEnabled = false,
+  targetLanguage = 'en',
   onRerun,
 }: {
   conv: ChatConversation;
   chatbotId: string;
-  translate?: boolean;
+  translateEnabled?: boolean;
+  targetLanguage?: string;
   onRerun?: (conv: ChatConversation) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -201,12 +310,6 @@ function ConversationCard({
 
       {expanded && (
         <div className="space-y-2.5 border-t border-grey-100 px-4 pb-4 pt-3">
-          {translate && (
-            <div className="flex items-center gap-1.5 rounded-lg bg-sky-50 px-2.5 py-1.5 text-[11px] text-sky-700">
-              <Languages className="h-3 w-3 shrink-0" />
-              Translation active — messages shown in English
-            </div>
-          )}
           {/* Messages */}
           {(conv.messages ?? []).map((msg, idx) => {
             const isHuman = msg.sender === 'human';
@@ -229,7 +332,13 @@ function ConversationCard({
                     <ThumbsDown className="h-3 w-3 text-red-500" />
                   )}
                 </div>
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.message_content}</p>
+                <p className="whitespace-pre-wrap leading-relaxed">
+                  <TranslatedText
+                    text={msg.message_content ?? ''}
+                    enabled={translateEnabled}
+                    targetLanguage={targetLanguage}
+                  />
+                </p>
                 {msg.timestamp && (
                   <p className="mt-1.5 text-[9px] text-muted-foreground/60">
                     {new Date(msg.timestamp).toLocaleTimeString(undefined, {
@@ -324,7 +433,8 @@ export function ChatLogsTab({ chatbotId, orgId }: ChatLogsTabProps) {
   const [dateOpen, setDateOpen] = useState(false);
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
   const [limit, setLimit] = useState(20);
-  const [translate, setTranslate] = useState(false);
+  const [translateEnabled, setTranslateEnabled] = useState(false);
+  const [targetLanguage, setTargetLanguage] = useState('en');
 
   const handleRerun = async (conv: ChatConversation) => {
     const userTurns = (conv.messages ?? [])
@@ -430,15 +540,12 @@ export function ChatLogsTab({ chatbotId, orgId }: ChatLogsTabProps) {
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-grey-900">Chat Logs</p>
-        <Button
-          size="sm"
-          variant={translate ? 'default' : 'outline'}
-          className="h-7 gap-1.5 text-xs"
-          onClick={() => setTranslate((v) => !v)}
-        >
-          <Languages className="h-3.5 w-3.5" />
-          Translate
-        </Button>
+        <TranslateButton
+          enabled={translateEnabled}
+          onToggle={setTranslateEnabled}
+          targetLanguage={targetLanguage}
+          onLanguageChange={setTargetLanguage}
+        />
       </div>
 
       {/* ── Controls ───────────────────────────────────────────────────────── */}
@@ -586,7 +693,8 @@ export function ChatLogsTab({ chatbotId, orgId }: ChatLogsTabProps) {
               key={conv.id}
               conv={conv}
               chatbotId={chatbotId}
-              translate={translate}
+              translateEnabled={translateEnabled}
+              targetLanguage={targetLanguage}
               onRerun={handleRerun}
             />
           ))}

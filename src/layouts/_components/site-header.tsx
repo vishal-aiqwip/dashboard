@@ -30,6 +30,7 @@ const breadcrumbLabelByPath: Record<string, string> = {
   '/dashboard/onboarding': 'Onboarding',
   '/dashboard/email-performance': 'Email Performance',
   '/dashboard/email-training-center': 'Email Training Center',
+  '/dashboard/chatbot/training-center': 'Training Center',
   '/dashboard/report-assessments': 'Report Assessments',
   '/dashboard/profile': 'Profile',
 };
@@ -80,6 +81,27 @@ function useBreadcrumbs(): Crumb[] {
   // /dashboard/manage-hotels and all other sub-routes
   if (pathname.startsWith('/dashboard/manage-hotels') && !hotelUsersMatch) {
     return [{ type: 'page', label: 'Manage Hotels' }];
+  }
+
+  // Named report-assessments sub-pages
+  const reportAssessmentsSubPages: Record<string, string> = {
+    '/dashboard/report-assessments/firm': 'Firm',
+    '/dashboard/report-assessments/chains-and-hotels': 'Chains & Hotels',
+    '/dashboard/report-assessments/benchmarks': 'Benchmarks',
+    '/dashboard/report-assessments/reports': 'Reports',
+  };
+  if (reportAssessmentsSubPages[pathname]) {
+    return [
+      { type: 'link', label: 'Report Assessments', to: '/dashboard/report-assessments' },
+      { type: 'page', label: reportAssessmentsSubPages[pathname] },
+    ];
+  }
+  if (pathname === '/dashboard/report-assessments/report-detail') {
+    return [
+      { type: 'link', label: 'Report Assessments', to: '/dashboard/report-assessments' },
+      { type: 'link', label: 'Reports', to: '/dashboard/report-assessments/reports' },
+      { type: 'page', label: 'Report Detail' },
+    ];
   }
 
   // Agent sub-routes

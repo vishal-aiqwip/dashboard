@@ -21,6 +21,7 @@ const SecurityPage = lazy(() => import('@/pages/manage-hotels/security'));
 const ChatbotTestPage = lazy(() => import('@/pages/chatbot-test'));
 const ChatbotTrainingCenterPage = lazy(() => import('@/pages/chatbot-training-center'));
 const EmailTrainingCenterPage = lazy(() => import('@/pages/email-training-center'));
+const AiEmailSettingsPage = lazy(() => import('@/pages/email-ai-settings'));
 
 const ReportAssessmentsLayout = lazy(() => import('@/pages/report-assessments/layout'));
 const ReportAssessmentsIndex = lazy(() => import('@/pages/report-assessments/index'));
@@ -176,6 +177,14 @@ const router = createBrowserRouter([
             element: (
               <LazyPage>
                 <EmailTrainingCenterPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'email/ai-settings',
+            element: (
+              <LazyPage>
+                <AiEmailSettingsPage />
               </LazyPage>
             ),
           },

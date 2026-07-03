@@ -4,22 +4,20 @@ import type { ChatbotDetail } from '@/services/chatbotTrainingCenter/chatbotTrai
 interface ChatbotPreviewProps {
   chatbot: ChatbotDetail;
   orgId: string;
+  refreshKey?: number;
 }
 
-export function ChatbotPreview({ chatbot, orgId }: ChatbotPreviewProps) {
+export function ChatbotPreview({ chatbot, orgId, refreshKey = 0 }: ChatbotPreviewProps) {
   const previewBase = CONFIG.CHATBOT_PREVIEW_URL;
 
   const iframeSrc =
     previewBase && orgId && chatbot.id
-      ? `${previewBase}?preview=true&cb-id=${encodeURIComponent(chatbot.id)}&org-id=${encodeURIComponent(orgId)}`
+      ? `${previewBase}?preview=true&cb-id=${encodeURIComponent(chatbot.id)}&org-id=${encodeURIComponent(orgId)}${refreshKey ? `&t=${refreshKey}` : ''}`
       : '';
 
   return (
-    <div className="flex w-full flex-col items-center gap-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Live preview
-      </p>
-
+    <div className="flex w-full sticky top-0  flex-col items-center gap-3">
+  
       <div
         className="w-full max-w-90 overflow-hidden rounded-2xl border border-grey-100 shadow-lg"
         style={{ height: 580 }}
@@ -38,7 +36,6 @@ export function ChatbotPreview({ chatbot, orgId }: ChatbotPreviewProps) {
         )}
       </div>
 
-      <p className="text-xs font-medium text-grey-700">{chatbot.chatbot_name}</p>
     </div>
   );
 }

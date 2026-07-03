@@ -52,6 +52,20 @@ export type ChatbotDetail = {
   header_logo?: string | null;
   avatar_icon?: string | null;
   bubble_icon?: string | null;
+  // Typography
+  font_family?: string | null;
+  font_family_header?: string | null;
+  font_size_header?: string | null;
+  font_weight_header?: string | null;
+  font_size_chat?: string | null;
+  // Bubble launcher label (text mode)
+  use_bubble_text?: boolean | null;
+  bubble_label_text?: string | null;
+  bubble_label_text_color?: string | null;
+  bubble_label_font_family?: string | null;
+  bubble_label_font_weight?: string | null;
+  bubble_label_font_size?: string | null;
+  published?: boolean | null;
 };
 
 export type KbDocument = {
@@ -126,9 +140,11 @@ export const chatbotTrainingCenterService = {
     }
   },
 
-  updateChatbot: async (chatbotId: string, payload: Partial<ChatbotDetail>): Promise<void> => {
+  updateChatbot: async (chatbotId: string, payload: Partial<ChatbotDetail>, orgId?: string): Promise<void> => {
     try {
-      await axiosApi.patch(`/api/chatbots/${chatbotId}`, payload);
+      await axiosApi.patch(`/api/chatbots/${chatbotId}`, payload, {
+        params: orgId ? { organization_id: orgId } : undefined,
+      });
     } catch (e) {
       throw apiErr(e, 'Failed to update chatbot');
     }

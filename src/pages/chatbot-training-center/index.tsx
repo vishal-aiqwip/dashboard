@@ -44,6 +44,7 @@ export default function ChatbotTrainingCenterPage() {
   const [selectedChatbotId, setSelectedChatbotId] = useState<string>('');
   const [localChatbot, setLocalChatbot] = useState<ChatbotDetail | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('knowledge');
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
 
   // ── Chatbots for selected org ───────────────────────────────────────────────
   const chatbotsQuery = useQuery({
@@ -90,6 +91,7 @@ export default function ChatbotTrainingCenterPage() {
 
   const handleChatbotSaved = (updated: Partial<ChatbotDetail>) => {
     setLocalChatbot((prev) => (prev ? { ...prev, ...updated } : prev));
+    setPreviewRefreshKey((k) => k + 1);
   };
 
   // ── No org selected yet ────────────────────────────────────────────────────
@@ -104,7 +106,7 @@ export default function ChatbotTrainingCenterPage() {
   return (
     <div className="flex h-full flex-col">
       {/* ── Header bar ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end gap-4 border-b border-grey-100 px-6 py-4">
+      {/* <div className="flex flex-wrap items-end gap-4 border-b border-grey-100 px-6 py-4">
         <div className="flex-1 min-w-0">
           <h2 className="text-xl font-semibold tracking-tight text-grey-900">Training Center</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -112,7 +114,7 @@ export default function ChatbotTrainingCenterPage() {
           </p>
         </div>
 
-        {/* Chatbot selector */}
+       
         <div className="space-y-1">
           <p className="text-[11px] font-medium text-grey-700">Chatbot</p>
           {chatbotsQuery.isLoading ? (
@@ -137,7 +139,7 @@ export default function ChatbotTrainingCenterPage() {
             </Select>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* ── Empty state ─────────────────────────────────────────────────────── */}
       {!chatbot && !chatbotsQuery.isLoading && (
@@ -158,12 +160,12 @@ export default function ChatbotTrainingCenterPage() {
       {chatbot && (
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Left: chatbot preview */}
-          <div className="hidden lg:flex w-110 shrink-0 flex-col items-center justify-center border-r border-grey-100 bg-muted/20 p-6 overflow-y-auto">
-            <ChatbotPreview chatbot={chatbot} orgId={orgId} />
+          <div className="hidden lg:flex w-110 relative flex-col items-center border-r border-grey-100 bg-muted/20 p-6 overflow-y-auto">
+            <ChatbotPreview chatbot={chatbot} orgId={orgId} refreshKey={previewRefreshKey} />
           </div>
 
           {/* Right: editing panel */}
-          <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+          <div className="flex bg-card flex-1 flex-col min-h-0 overflow-hidden">
             {/* No KB warning */}
             {!kbId && (
               <div className="border-b border-amber-200 bg-amber-50/40 px-5 py-2">
@@ -209,7 +211,7 @@ export default function ChatbotTrainingCenterPage() {
                 <ChatLogsTab chatbotId={chatbot.id} orgId={orgId} />
               )}
               {activeTab === 'display' && (
-                <DisplayTab chatbot={chatbot} onSaved={handleChatbotSaved} />
+                <DisplayTab chatbot={chatbot} orgId={orgId} onSaved={handleChatbotSaved} />
               )}
               {activeTab === 'behavior' && (
                 <BehaviorTab chatbot={chatbot} onSaved={handleChatbotSaved} />
