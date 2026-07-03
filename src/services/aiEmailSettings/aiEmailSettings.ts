@@ -112,13 +112,29 @@ export type PromptHistory = {
 export type ConsentStatus = {
   has_consent: boolean;
   consent_url?: string | null;
+  admin_consent_granted?: boolean;
+  graph_app_only_verified?: boolean;
+  grant_access_link?: string | null;
+};
+
+export type InviteItPartnerPayload = {
+  organization_id: string;
+  it_partner_name: string;
+  it_partner_email: string;
+  message?: string;
+  requested_mailboxes?: string[];
+};
+
+export type InviteItPartnerResponse = {
+  data?: { grant_access_link?: string | null };
 };
 
 export type OnboardingStatus = {
   status: 'queued' | 'running' | 'success' | 'error';
-  progress?: number;
+  progress?: number | Record<string, number>;
   message?: string;
   step?: string;
+  current_step?: string;
   job_type?: string;
 };
 
@@ -222,8 +238,8 @@ export const aiEmailSettingsService = {
   createSubscription: async (orgId: string, mailboxEmail: string): Promise<void> => {
     try {
       await axiosApi.post('/api/ai-email/subscriptions/create', {
-        organization_id: orgId,
-        mailbox_email: mailboxEmail,
+        orgId,
+        mailboxEmail,
       });
     } catch (e) {
       throw apiErr(e, 'Failed to create subscription');
@@ -233,8 +249,8 @@ export const aiEmailSettingsService = {
   recreateSubscription: async (orgId: string, mailboxEmail: string): Promise<void> => {
     try {
       await axiosApi.post('/api/ai-email/subscriptions/recreate', {
-        organization_id: orgId,
-        mailbox_email: mailboxEmail,
+        orgId,
+        mailboxEmail,
       });
     } catch (e) {
       throw apiErr(e, 'Failed to reconnect subscription');
@@ -244,8 +260,8 @@ export const aiEmailSettingsService = {
   deleteSubscription: async (orgId: string, mailboxEmail: string): Promise<void> => {
     try {
       await axiosApi.post('/api/ai-email/subscriptions/delete', {
-        organization_id: orgId,
-        mailbox_email: mailboxEmail,
+        orgId,
+        mailboxEmail,
       });
     } catch (e) {
       throw apiErr(e, 'Failed to delete subscription');
@@ -289,6 +305,18 @@ export const aiEmailSettingsService = {
 
   // ── Consent ────────────────────────────────────────────────────────────────
 
+  inviteItPartner: async (payload: InviteItPartnerPayload): Promise<InviteItPartnerResponse> => {
+    try {
+      const { data } = await axiosApi.post<InviteItPartnerResponse>(
+        '/api/ai-email/onboarding/invite-it-partner',
+        payload,
+      );
+      return data;
+    } catch (e) {
+      throw apiErr(e, 'Failed to send IT partner invite');
+    }
+  },
+
   getConsentStatus: async (orgId: string): Promise<ConsentStatus> => {
     try {
       const { data } = await axiosApi.get<unknown>('/api/ai-email/consent/status', {
@@ -306,12 +334,14 @@ export const aiEmailSettingsService = {
     orgId: string,
     mailboxEmail: string,
     jobType: 'import_emails' | 'learn_writing_style' | 'learn_kb',
+    opts?: { lookback_days?: number },
   ): Promise<{ job_id: string }> => {
     try {
       const { data } = await axiosApi.post<unknown>('/api/ai-email/onboarding/start', {
         organization_id: orgId,
         mailbox_email: mailboxEmail,
         job_type: jobType,
+        ...(opts?.lookback_days !== undefined && { lookback_days: opts.lookback_days }),
       });
       return unwrap<{ job_id: string }>(data);
     } catch (e) {
